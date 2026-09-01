@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stay Types — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="data.js"></script>
+  <script src="filters.js"></script>
+  <style>
+    .stay-cell {
+      text-align: center; padding: 8px 6px; vertical-align: middle;
+    }
+    .stay-toggle {
+      position: relative; display: inline-block; width: 30px; height: 17px; cursor: pointer;
+    }
+    .stay-toggle input { opacity: 0; width: 0; height: 0; }
+    .stay-toggle .slider {
+      position: absolute; inset: 0; background: #cbd2dc; border-radius: 17px; transition: background .15s;
+    }
+    .stay-toggle .slider::before {
+      content: ''; position: absolute; width: 13px; height: 13px; left: 2px; top: 2px;
+      background: #fff; border-radius: 50%; transition: transform .15s;
+    }
+    .stay-toggle input:checked + .slider { background: var(--accent); }
+    .stay-toggle input:checked + .slider::before { transform: translateX(13px); }
+    .stay-prem-input {
+      width: 52px; border: 1px solid var(--border-mid); border-radius: 4px;
+      padding: 3px 5px; font-family: 'Inter', sans-serif; font-size: 11.5px;
+      text-align: center; color: var(--text-primary); background: var(--surface); outline: none;
+      margin-top: 5px; display: block; margin-left: auto; margin-right: auto;
+    }
+    .stay-prem-input:focus { border-color: var(--accent); }
+    .stay-prem-input:disabled { background: var(--body-bg); color: var(--text-muted); border-style: dashed; }
+    .stay-prem-input.changed { border-color: var(--accent); background: rgba(232,0,125,0.05); }
+    .stay-th-months { font-size: 9.5px; color: var(--text-muted); font-weight: 400; display: block; margin-top: 2px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+
+    <div class="nav-tabs">
+      <a href="pricing.html"      class="nav-tab">Pricing</a>
+      <a href="stay-types.html"   class="nav-tab active">Stay Types</a>
+      <a href="rent-control.html" class="nav-tab">Rent Control</a>
+      <a href="autopilot.html"    class="nav-tab">Autopilot</a>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+          Parameters
+        </a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>
+          Log out
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Filter Bar ── -->
+  <div class="filter-bar" id="filterBar"></div>
+
+  <!-- ── Sub-tab Bar ── -->
+  <div class="subtab-bar">
+    <span class="subtab active" style="cursor:default;">Stay type availability &amp; premiums</span>
+    <span style="font-size:11.5px;color:var(--text-muted);margin-left:14px;">Premiums are % vs Full Year Stay &middot; applied on top of the unit's base rate</span>
+    <div class="subtab-spacer"></div>
+    <button class="btn-save" id="saveBtn" onclick="saveChanges()" style="display:none;">Save</button>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="table-wrap" id="tableWrap">
+      <table class="data-table" id="stayTable">
+        <thead>
+          <tr id="stayHead">
+            <th style="min-width:230px;position:sticky;left:0;background:var(--surface);z-index:11;">House / Room Type</th>
+          </tr>
+        </thead>
+        <tbody id="stayBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let expandedHouses = new Set();
+// pending changes: key = houseId:roomTypeOrNull:stayTypeId:field → value
+const stayChanges = {};
+
+function _skey(houseId, roomType, stayTypeId, field) {
+  return houseId + ':' + (roomType || '__house__') + ':' + stayTypeId + ':' + field;
+}
+
+// ── Nav menu ──────────────────────────────────────────────
+function toggleMenu() {
+  document.getElementById('navDropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-btn') && !e.target.closest('.nav-dropdown')) {
+    document.getElementById('navDropdown').classList.remove('open');
+  }
+});
+
+// ── Filters (shared pill component) ───────────────────────
+let pillFilters = null;
+function getMsValues(id) { return pillFilters ? pillFilters.values(id) : []; }
+
+function populateFilters() {
+  pillFilters = createPillFilters({
+    container: document.getElementById('filterBar'),
+    filters: [
+      { id: 'country', label: 'Countries',        items: [...new Set(HOUSES.map(c => c.country))] },
+      { id: 'city',    label: 'Cities',           items: [...new Set(HOUSES.map(c => c.city))] },
+      { id: 'house',   label: 'Houses',           items: HOUSES.map(c => c.name) },
+      { id: 'rm',      label: 'Revenue Managers', items: [...new Set(HOUSES.map(c => c.rm))] },
+    ],
+    onChange: renderStayTable,
+  });
+}
+
+// ── Header ────────────────────────────────────────────────
+function renderHead() {
+  const head = document.getElementById('stayHead');
+  STAY_TYPES.forEach(st => {
+    const th = document.createElement('th');
+    th.style.cssText = 'width:130px;text-align:center;font-size:12px;padding:8px 6px;';
+    th.innerHTML = st.label.replace(' Plug&Play', '<br>Plug&amp;Play') +
+      '<span class="stay-th-months">' + st.months + ' months · default ' + (st.premiumPct > 0 ? '+' : '') + st.premiumPct + '%</span>';
+    head.appendChild(th);
+  });
+}
+
+// ── Table ─────────────────────────────────────────────────
+function stayStateFor(scope, stayTypeId) {
+  // scope = { houseId, roomType|null, stays } — apply pending changes on top
+  const rec = scope.stays.find(s => s.stayTypeId === stayTypeId);
+  const availKey = _skey(scope.houseId, scope.roomType, stayTypeId, 'avail');
+  const premKey  = _skey(scope.houseId, scope.roomType, stayTypeId, 'prem');
+  return {
+    available: availKey in stayChanges ? stayChanges[availKey] : rec.available,
+    premiumPct: premKey in stayChanges ? stayChanges[premKey] : rec.premiumPct,
+    premChanged: premKey in stayChanges,
+  };
+}
+
+function stayCellHtml(scope, st) {
+  const s = stayStateFor(scope, st.id);
+  const isDefault = st.id === DEFAULT_STAY_TYPE;
+  const scopeAttr = `data-house="${scope.houseId}" data-room="${scope.roomType || ''}" data-stay="${st.id}"`;
+  return `<td class="stay-cell">
+    <label class="stay-toggle" title="${isDefault ? 'Full Year Stay is always available' : 'Toggle availability'}">
+      <input type="checkbox" ${s.available ? 'checked' : ''} ${isDefault ? 'disabled' : ''} onchange="onAvailToggle(this)" ${scopeAttr}>
+      <span class="slider" ${isDefault ? 'style="opacity:.45;cursor:not-allowed;"' : ''}></span>
+    </label>
+    <input type="text" class="stay-prem-input${s.premChanged ? ' changed' : ''}" value="${isDefault ? '0%' : (s.premiumPct > 0 ? '+' : '') + s.premiumPct + '%'}"
+      ${(!s.available || isDefault) ? 'disabled' : ''} onchange="onPremChange(this)" onfocus="this.select()" ${scopeAttr}>
+  </td>`;
+}
+
+function renderStayTable() {
+  const tb = document.getElementById('stayBody');
+  tb.innerHTML = '';
+
+  const countryF = getMsValues('country');
+  const cityF = getMsValues('city');
+  const houseF = getMsValues('house');
+  const rmF = getMsValues('rm');
+
+  const data = STAY_CONFIG.filter(c => {
+    if (countryF.length && !countryF.includes(c.country)) return false;
+    if (cityF.length && !cityF.includes(c.city)) return false;
+    if (houseF.length && !houseF.includes(c.name)) return false;
+    if (rmF.length && !rmF.includes(c.rm)) return false;
+    return true;
+  });
+
+  data.forEach(house => {
+    const open = expandedHouses.has(house.id);
+    const tr = document.createElement('tr');
+    tr.className = 'row-property';
+    tr.innerHTML = `
+      <td style="position:sticky;left:0;background:inherit;z-index:2;">
+        <button class="expand-btn ${open ? 'open' : ''}" onclick="toggleHouse('${house.id}')">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
+        </button>
+        <strong>${house.name}</strong>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${house.city}</span>
+      </td>
+      ${STAY_TYPES.map(st => stayCellHtml({ houseId: house.id, roomType: null, stays: house.stays }, st)).join('')}
+    `;
+    tb.appendChild(tr);
+
+    if (!open) return;
+
+    house.roomTypes.forEach(rt => {
+      const btr = document.createElement('tr');
+      btr.className = 'row-bedtype';
+      btr.innerHTML = `
+        <td style="position:sticky;left:0;background:inherit;z-index:2;padding-left:38px;">${rt.type}</td>
+        ${STAY_TYPES.map(st => stayCellHtml({ houseId: house.id, roomType: rt.type, stays: rt.stays }, st)).join('')}
+      `;
+      tb.appendChild(btr);
+    });
+  });
+}
+
+function toggleHouse(id) {
+  if (expandedHouses.has(id)) expandedHouses.delete(id);
+  else expandedHouses.add(id);
+  renderStayTable();
+}
+
+// ── Change handling ───────────────────────────────────────
+function onAvailToggle(input) {
+  const key = _skey(input.dataset.house, input.dataset.room || null, input.dataset.stay, 'avail');
+  stayChanges[key] = input.checked;
+  // House-level toggles cascade to room types
+  if (!input.dataset.room) {
+    UNIT_TYPES.forEach(rt => {
+      stayChanges[_skey(input.dataset.house, rt, input.dataset.stay, 'avail')] = input.checked;
+    });
+  }
+  checkSaveVisibility();
+  renderStayTable();
+}
+
+function onPremChange(input) {
+  const num = parseFloat(input.value.replace(/[^0-9.\-]/g, ''));
+  if (isNaN(num)) { renderStayTable(); return; }
+  const key = _skey(input.dataset.house, input.dataset.room || null, input.dataset.stay, 'prem');
+  stayChanges[key] = num;
+  if (!input.dataset.room) {
+    UNIT_TYPES.forEach(rt => {
+      stayChanges[_skey(input.dataset.house, rt, input.dataset.stay, 'prem')] = num;
+    });
+  }
+  checkSaveVisibility();
+  renderStayTable();
+}
+
+function checkSaveVisibility() {
+  const btn = document.getElementById('saveBtn');
+  if (btn) btn.style.display = Object.keys(stayChanges).length > 0 ? 'inline-flex' : 'none';
+}
+
+function saveChanges() {
+  // Commit pending changes into STAY_CONFIG
+  Object.keys(stayChanges).forEach(key => {
+    const [houseId, room, stayTypeId, field] = key.split(':');
+    const house = STAY_CONFIG.find(h => h.id === houseId);
+    if (!house) return;
+    const scope = room === '__house__' ? house : house.roomTypes.find(rt => rt.type === room);
+    if (!scope) return;
+    const rec = scope.stays.find(s => s.stayTypeId === stayTypeId);
+    if (!rec) return;
+    if (field === 'avail') rec.available = stayChanges[key];
+    if (field === 'prem') rec.premiumPct = stayChanges[key];
+  });
+  const n = Object.keys(stayChanges).length;
+  Object.keys(stayChanges).forEach(k => delete stayChanges[k]);
+  checkSaveVisibility();
+  renderStayTable();
+  showToast('Stay type configuration saved');
+}
+
+function showToast(message) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'toast';
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;opacity:0;transition:opacity .2s;display:flex;align-items:center;gap:8px;';
+  el.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="2,7 5.5,10.5 12,3"/></svg>' + message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, 2500);
+}
+
+// ── Init ──────────────────────────────────────────────────
+populateFilters();
+renderHead();
+renderStayTable();
+</script>
+</body>
+</html>

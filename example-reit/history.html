@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lease History — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="data.js"></script>
+  <script src="date-picker.js"></script>
+  <style>
+    /* ── Lease History page-specific ────────────────────────── */
+    .hist-controls {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      height: 48px;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+    .hist-date-shortcuts {
+      display: inline-flex;
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .hist-date-shortcuts button {
+      background: var(--surface);
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 6px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .hist-date-shortcuts button:last-child { border-right: none; }
+    .hist-date-shortcuts button:hover { background: var(--row-hover); }
+    .hist-date-shortcuts button.active { background: var(--accent); color: #fff; font-weight: 600; }
+    /* Custom-range trigger that opens the shared DateRangePicker. Styled to
+       look like an input field so it sits flush next to the shortcut pills. */
+    .hist-date-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 5px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: var(--text-primary);
+      background: var(--surface);
+      cursor: pointer;
+      min-width: 220px;
+      height: 30px;
+      transition: border-color .12s;
+    }
+    .hist-date-trigger:hover  { border-color: var(--accent); }
+    .hist-date-trigger:focus  { outline: none; border-color: var(--accent); }
+    .hist-date-trigger.is-placeholder { color: var(--text-muted); }
+    .hist-date-trigger svg    { color: var(--text-muted); flex-shrink: 0; }
+    .hist-search {
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 6px 10px 6px 30px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      color: var(--text-primary);
+      background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none' stroke='%239ca3af' stroke-width='1.5'%3E%3Ccircle cx='6' cy='6' r='4'/%3E%3Cline x1='9' y1='9' x2='12.5' y2='12.5'/%3E%3C/svg%3E") no-repeat 9px center;
+      width: 260px;
+      outline: none;
+    }
+    .hist-search:focus { border-color: var(--accent); }
+    .hist-spacer { flex: 1; }
+    .hist-count { font-size: 12px; color: var(--text-muted); }
+
+    /* Event badge pill (4 lease event types) */
+    .evt-pill {
+      display: inline-block;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      border-radius: 10px;
+      padding: 2px 9px;
+      white-space: nowrap;
+    }
+
+    /* Community class badge */
+    .class-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .class-A { background: #f59e0b; color: #fff; }
+    .class-B { background: #64748b; color: #fff; }
+
+    /* Event-type multi-select trigger */
+    .evt-ms-trigger {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: 20px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 4px 12px;
+      min-width: 150px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .15s;
+    }
+    .evt-ms-trigger:hover { border-color: var(--accent); }
+    .evt-ms-trigger svg { flex-shrink: 0; color: #6b7280; }
+    .evt-ms-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 200px;
+      background: #1e2028;
+      border: 1px solid #2a2d35;
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      z-index: 200;
+      display: none;
+      padding: 4px 0;
+    }
+    .evt-ms-wrap { position: relative; display: inline-block; }
+    .evt-ms-wrap.open .evt-ms-dropdown { display: block; }
+    .evt-ms-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      color: #cbd5e1;
+      font-size: 12.5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .evt-ms-option:hover { background: rgba(255,255,255,.05); }
+    .evt-ms-option input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+
+    /* Feed table */
+    .feed-wrap {
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+    .feed-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      table-layout: fixed;
+    }
+    .feed-table thead th {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: .02em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .feed-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    .feed-table tbody tr:hover { background: var(--row-hover); }
+    .feed-table tbody td {
+      padding: 9px 12px;
+      vertical-align: middle;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .feed-date   { color: var(--text-primary); font-weight: 500; font-size: 12px; }
+    /* Projected (scheduled/future) dates — subtle muted-italic to distinguish
+       from actual/recorded dates. Matches the colour of "None" text.
+       Second selector overrides .tl-grid dd's primary colour inside the panel. */
+    .date-projected,
+    .tl-grid dd.date-projected { color: var(--text-muted); font-style: italic; font-weight: 400; }
+    .feed-unit-link {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .feed-unit-link:hover { text-decoration: underline; }
+    .feed-mono   { font-size: 12px; }
+    .feed-muted  { color: var(--text-muted); }
+    .feed-resident { color: var(--text-primary); }
+    .feed-user   { color: var(--text-secondary); font-size: 12px; }
+
+    /* Empty state */
+    .empty-state {
+      padding: 48px 20px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .empty-state h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+    .empty-state p { font-size: 12.5px; margin-bottom: 16px; }
+
+    /* Unit timeline side panel */
+    .timeline-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 400;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .timeline-backdrop.open { opacity: 1; pointer-events: auto; }
+    .timeline-panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 600px;
+      max-width: 90vw;
+      background: var(--surface);
+      box-shadow: var(--shadow-lg);
+      z-index: 500;
+      transform: translateX(100%);
+      transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .timeline-panel.open { transform: translateX(0); }
+    .timeline-header {
+      padding: 18px 22px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .timeline-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .timeline-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 5px; line-height: 1.5; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .timeline-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+    }
+    .timeline-close:hover { background: var(--row-hover); color: var(--text-primary); }
+    .timeline-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 22px 22px;
+    }
+    .tl-day-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin: 20px 0 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tl-day-label:first-child { margin-top: 4px; }
+    .tl-card {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      background: #fcfcfd;
+    }
+    .tl-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .tl-card-resident { font-size: 12.5px; color: var(--text-primary); font-weight: 500; }
+    .tl-card-time { margin-left: auto; font-size: 11.5px; color: var(--text-muted); }
+    .tl-grid {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 4px 14px;
+      font-size: 12px;
+    }
+    .tl-grid dt { color: var(--text-muted); white-space: nowrap; }
+    .tl-grid dd { color: var(--text-primary); }
+    .tl-user { margin-top: 8px; font-size: 11.5px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+    <div class="nav-tabs">
+      <a href="pricing.html" class="nav-tab">Pricing</a>
+      <a href="expiration.html" class="nav-tab">Expiration Management</a>
+      <a href="term.html" class="nav-tab">Term Management</a>
+      <a href="concessions.html" class="nav-tab">Concession Management</a>
+      <a href="rent-control.html" class="nav-tab">Rent Control</a>
+    </div>
+    <div class="nav-divider"></div>
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+          Parameters
+        </a>
+        <a href="history.html" style="background:var(--row-hover);color:var(--accent);font-weight:600;">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 11,10"/></svg>
+          Lease History
+        </a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>
+          Log out
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Global filters (State / Metro / Community / RM / CD) -->
+  <div class="filter-bar" id="filterBar"></div>
+
+  <!-- Lease-history-specific controls -->
+  <div class="hist-controls">
+    <div class="hist-date-shortcuts" id="dateShortcuts">
+      <button data-days="7">7 days</button>
+      <button data-days="30" class="active">30 days</button>
+      <button data-days="90">90 days</button>
+    </div>
+    <div class="hist-date-range" style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:11.5px;color:var(--text-muted);">or</span>
+      <button type="button" id="historyRangeTrigger" class="hist-date-trigger is-placeholder">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="10" height="9" rx="1"/><line x1="2" y1="6" x2="12" y2="6"/><line x1="5" y1="2" x2="5" y2="4"/><line x1="9" y1="2" x2="9" y2="4"/></svg>
+        <span id="historyRangeLabel">Custom range</span>
+      </button>
+    </div>
+    <div class="evt-ms-wrap" id="eventTypeMsWrap">
+      <button class="evt-ms-trigger" onclick="toggleEventTypeMs()">
+        <span id="evtMsLabel">All Event Types</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+      <div class="evt-ms-dropdown" id="evtMsDropdown"></div>
+    </div>
+    <input type="search" id="historySearch" class="hist-search" placeholder="Search unit ID or resident..." oninput="renderFeed()">
+    <div class="hist-spacer"></div>
+    <span class="hist-count" id="historyCount"></span>
+  </div>
+
+  <div class="main">
+    <div class="feed-wrap" id="feedWrap"></div>
+  </div>
+</div>
+
+<!-- Unit Timeline Side Panel -->
+<div class="timeline-backdrop" id="timelineBackdrop" onclick="closeTimeline()"></div>
+<div class="timeline-panel" id="timelinePanel">
+  <div class="timeline-header">
+    <div style="flex:1;min-width:0;">
+      <div class="timeline-title" id="timelineTitle">Unit Timeline</div>
+      <div class="timeline-subtitle" id="timelineSubtitle"></div>
+    </div>
+    <button class="timeline-close" onclick="closeTimeline()" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+    </button>
+  </div>
+  <div class="timeline-body" id="timelineBody"></div>
+</div>
+
+<script>
+// ── Constants ────────────────────────────────────────────
+const TODAY = new Date('2026-04-21T23:59:59');
+const DAY_MS = 86400000;
+const COMMUNITY_BY_ID = {}; COMMUNITIES.forEach(c => { COMMUNITY_BY_ID[c.id] = c; });
+
+const EVENT_TYPE_ORDER = ['new_lease_signed', 'renewal_signed', 'move_in', 'move_out'];
+
+// ── State ────────────────────────────────────────────────
+let dateFrom = new Date(TODAY.getTime() - 30 * DAY_MS);
+let dateTo   = new Date(TODAY.getTime());
+let selectedEventTypes = new Set(EVENT_TYPE_ORDER); // all 4 checked by default
+
+// ── Nav menu ─────────────────────────────────────────────
+function toggleMenu() { document.getElementById('navDropdown').classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-btn') && !e.target.closest('.nav-dropdown')) {
+    document.getElementById('navDropdown').classList.remove('open');
+  }
+});
+
+// ── Global filter bar (same pattern as other pages) ──────
+function buildMultiSelect(config) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ms-wrap';
+  wrap.id = 'ms-' + config.id;
+  wrap.innerHTML = `
+    <button class="ms-trigger" onclick="toggleMs('${config.id}')">
+      <span class="ms-label">${config.defaultLabel}</span>
+      <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+    </button>
+    <div class="ms-dropdown">
+      <div class="ms-search"><input type="text" placeholder="Search..." oninput="filterMsOptions('${config.id}',this.value)"></div>
+      <div class="ms-options">
+        <label class="ms-option ms-all"><input type="checkbox" value="__all__" checked onchange="toggleMsAll('${config.id}',this)"> All</label>
+        ${config.items.map(item => `<label class="ms-option"><input type="checkbox" value="${item}" onchange="onMsChange('${config.id}')"> ${item}</label>`).join('')}
+      </div>
+    </div>
+  `;
+  return wrap;
+}
+function toggleMs(id) {
+  document.querySelectorAll('.ms-wrap').forEach(w => { if (w.id !== 'ms-' + id) w.classList.remove('open'); });
+  document.getElementById('ms-' + id).classList.toggle('open');
+}
+function filterMsOptions(id, q) {
+  const lo = q.toLowerCase();
+  document.querySelectorAll('#ms-' + id + ' .ms-option:not(.ms-all)').forEach(o => {
+    o.style.display = o.textContent.toLowerCase().includes(lo) ? '' : 'none';
+  });
+}
+function toggleMsAll(id, cb) {
+  document.querySelectorAll('#ms-' + id + ' .ms-option:not(.ms-all) input').forEach(c => c.checked = false);
+  cb.checked = true;
+  onMsChange(id);
+}
+function onMsChange(id) {
+  const w = document.getElementById('ms-' + id);
+  const ac = w.querySelector('.ms-all input');
+  if (![...w.querySelectorAll('.ms-option:not(.ms-all) input')].some(c => c.checked)) ac.checked = true;
+  else ac.checked = false;
+  updateMsLabel(id);
+  renderFeed();
+}
+function getMsValues(id) {
+  const w = document.getElementById('ms-' + id);
+  if (!w) return [];
+  if (w.querySelector('.ms-all input').checked) return [];
+  return [...w.querySelectorAll('.ms-option:not(.ms-all) input:checked')].map(c => c.value);
+}
+function updateMsLabel(id) {
+  const w = document.getElementById('ms-' + id);
+  const l = w.querySelector('.ms-label');
+  const d = w.querySelector('.ms-trigger').dataset.default;
+  const v = getMsValues(id);
+  if (!v.length) l.textContent = d;
+  else if (v.length <= 2) l.textContent = v.join(', ');
+  else l.textContent = v.length + ' ' + d.replace('All ', '');
+}
+function populateFilters() {
+  const bar = document.getElementById('filterBar');
+  [
+    { id:'state',     defaultLabel:'All States',              items:['Texas','Florida','Georgia','North Carolina','Virginia','Arizona','Colorado'] },
+    { id:'metro',     defaultLabel:'All Metros',              items:[...new Set(COMMUNITIES.map(c => c.metro))] },
+    { id:'community', defaultLabel:'All Communities',         items:COMMUNITIES.map(c => c.name) },
+    { id:'rm',        defaultLabel:'All Revenue Managers',    items:[...new Set(COMMUNITIES.map(c => c.rm))] },
+    { id:'cd',        defaultLabel:'All Community Directors', items:[...new Set(COMMUNITIES.map(c => c.cd))] },
+  ].forEach(cfg => {
+    const el = buildMultiSelect(cfg);
+    el.querySelector('.ms-trigger').dataset.default = cfg.defaultLabel;
+    bar.appendChild(el);
+  });
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-wrap')) document.querySelectorAll('.ms-wrap').forEach(w => w.classList.remove('open'));
+  if (!e.target.closest('.evt-ms-wrap')) document.getElementById('eventTypeMsWrap')?.classList.remove('open');
+});
+
+// ── Event type multi-select (flat, all 4 checked by default) ──
+function buildEventTypeMs() {
+  const dd = document.getElementById('evtMsDropdown');
+  dd.innerHTML = EVENT_TYPE_ORDER.map(type => `
+    <label class="evt-ms-option">
+      <input type="checkbox" value="${type}" checked onchange="onEventTypeChange()">
+      ${LEASE_EVENT_META[type].label}
+    </label>
+  `).join('');
+}
+function toggleEventTypeMs() {
+  document.getElementById('eventTypeMsWrap').classList.toggle('open');
+}
+function onEventTypeChange() {
+  selectedEventTypes = new Set(
+    [...document.querySelectorAll('#evtMsDropdown input:checked')].map(cb => cb.value)
+  );
+  const lbl = document.getElementById('evtMsLabel');
+  if (selectedEventTypes.size === EVENT_TYPE_ORDER.length) lbl.textContent = 'All Event Types';
+  else if (selectedEventTypes.size === 0) lbl.textContent = 'No Event Types';
+  else if (selectedEventTypes.size <= 2) {
+    lbl.textContent = [...selectedEventTypes].map(t => LEASE_EVENT_META[t].label).join(', ');
+  } else {
+    lbl.textContent = selectedEventTypes.size + ' event types';
+  }
+  renderFeed();
+}
+
+// ── Date range ───────────────────────────────────────────
+// Shared state: `historyPicker` is the custom-range picker instance. Shortcuts
+// clear its display when selected; picks through the picker deactivate the
+// shortcuts. setRange is silent, so shortcut→picker sync never loops back.
+let historyPicker = null;
+
+function setDateShortcut(days) {
+  dateFrom = new Date(TODAY.getTime() - days * DAY_MS);
+  dateTo   = new Date(TODAY.getTime());
+  document.querySelectorAll('#dateShortcuts button').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.days) === days);
+  });
+  if (historyPicker) historyPicker.setRange(null, null);
+  renderFeed();
+}
+
+// ── Filter logic ─────────────────────────────────────────
+function getFilteredEvents() {
+  const sf = getMsValues('state'), mf = getMsValues('metro'),
+        cf = getMsValues('community'), rf = getMsValues('rm'), df = getMsValues('cd');
+  const q = document.getElementById('historySearch').value.trim().toLowerCase();
+  const fromMs = dateFrom.getTime(), toMs = dateTo.getTime();
+  return LEASE_HISTORY_DATA.filter(ev => {
+    const tMs = Date.parse(ev.eventDate);
+    if (tMs < fromMs || tMs > toMs) return false;
+    const comm = COMMUNITY_BY_ID[ev.communityId];
+    if (!comm) return false;
+    if (sf.length && !sf.includes(comm.state)) return false;
+    if (mf.length && !mf.includes(comm.metro)) return false;
+    if (cf.length && !cf.includes(comm.name))  return false;
+    if (rf.length && !rf.includes(comm.rm))    return false;
+    if (df.length && !df.includes(comm.cd))    return false;
+    if (!selectedEventTypes.has(ev.eventType)) return false;
+    if (q) {
+      const hay = (ev.unitId + ' ' + (ev.resident || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ── Formatting helpers ───────────────────────────────────
+// All seed dates are stored at UTC noon to keep calendar-day identity stable
+// across timezones. Use UTC accessors everywhere we format.
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatEventDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+function formatDayLabel(iso) { return formatEventDate(iso); }
+function fmtUSD(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
+
+function eventPill(type) {
+  const meta = LEASE_EVENT_META[type];
+  const st   = LEASE_EVENT_STYLE[type];
+  return `<span class="evt-pill" style="background:#f1f5f9;color:${st.fg};">${meta.label}</span>`;
+}
+function communityBadge(comm) {
+  return comm.name;
+}
+function concessionText(ev) {
+  if (ev.eventType !== 'new_lease_signed' && ev.eventType !== 'renewal_signed') return '';
+  if (!ev.concession) return '<span class="feed-muted">None</span>';
+  return ev.concession.description;
+}
+function leaseOrBlank(ev, render) {
+  if (ev.eventType !== 'new_lease_signed' && ev.eventType !== 'renewal_signed') return '';
+  return render();
+}
+
+// ── Feed render ──────────────────────────────────────────
+function renderFeed() {
+  const evs = getFilteredEvents();
+  const wrap = document.getElementById('feedWrap');
+  document.getElementById('historyCount').textContent =
+    evs.length + ' event' + (evs.length === 1 ? '' : 's');
+
+  if (!evs.length) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <h3>No lease events match the current filters</h3>
+        <p>Try widening the date range, clearing the search, or re-enabling event types.</p>
+        <button class="btn btn-primary" onclick="resetAllFilters()">Reset filters</button>
+      </div>`;
+    return;
+  }
+
+  // Per-column projected-vs-actual rules:
+  //   moveInDate  is projected on new_lease_signed (scheduled move-in); actual on move_in
+  //   moveOutDate is projected on new/renewal (lease-end estimate); actual on move_out
+  //   renewalEffectiveDate is always projected (only populated on renewal events)
+  //   eventDate is always actual
+  const isMoveInProjected  = ev => ev.eventType === 'new_lease_signed';
+  const isMoveOutProjected = ev => ev.eventType === 'new_lease_signed' || ev.eventType === 'renewal_signed';
+
+  const rows = evs.map(ev => {
+    const comm = COMMUNITY_BY_ID[ev.communityId];
+    const cMoveIn  = 'feed-date' + (isMoveInProjected(ev)  ? ' date-projected' : '');
+    const cMoveOut = 'feed-date' + (isMoveOutProjected(ev) ? ' date-projected' : '');
+    const cRenEff  = 'feed-date' + (ev.renewalEffectiveDate ? ' date-projected' : '');
+    return `
+      <tr>
+        <td class="feed-date">${formatEventDate(ev.eventDate)}</td>
+        <td>${communityBadge(comm)}</td>
+        <td><button class="feed-unit-link" onclick="openUnitTimeline('${ev.unitId}')">${ev.unitId}</button></td>
+        <td>${eventPill(ev.eventType)}</td>
+        <td class="${cMoveIn}">${formatEventDate(ev.moveInDate)}</td>
+        <td class="${cMoveOut}">${formatEventDate(ev.moveOutDate)}</td>
+        <td class="${cRenEff}">${formatEventDate(ev.renewalEffectiveDate)}</td>
+        <td>${leaseOrBlank(ev, () => ev.leaseTerm + ' mo')}</td>
+        <td class="feed-mono">${leaseOrBlank(ev, () => fmtUSD(ev.grossRent))}</td>
+        <td>${concessionText(ev)}</td>
+        <td class="feed-mono">${leaseOrBlank(ev, () => fmtUSD(ev.netEffRent))}</td>
+        <td class="feed-resident">${ev.resident}</td>
+        <td class="feed-user">${ev.user}</td>
+      </tr>`;
+  }).join('');
+
+  // 13 columns. All four date columns share the same 104px width so the
+  // compact "20 Apr 2026" format never truncates and the four columns look
+  // visually consistent. Resident absorbs slack at 1920px.
+  wrap.innerHTML = `
+    <table class="feed-table">
+      <colgroup>
+        <col style="width:104px;">  <!-- Event Date -->
+        <col style="width:200px;">  <!-- Community -->
+        <col style="width:150px;">  <!-- Unit -->
+        <col style="width:102px;">  <!-- Event -->
+        <col style="width:104px;">  <!-- Move-in -->
+        <col style="width:104px;">  <!-- Move-out -->
+        <col style="width:104px;">  <!-- Renewal Effective -->
+        <col style="width:64px;">   <!-- Term -->
+        <col style="width:82px;">   <!-- Gross Rent -->
+        <col style="width:120px;">  <!-- Concession -->
+        <col style="width:82px;">   <!-- Net Eff. -->
+        <col>                       <!-- Resident (flex, truncate) -->
+        <col style="width:110px;">  <!-- User -->
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Event Date</th>
+          <th>Community</th>
+          <th>Unit</th>
+          <th>Event</th>
+          <th>Move-in</th>
+          <th>Move-out</th>
+          <th>Renewal Eff.</th>
+          <th>Term</th>
+          <th>Gross Rent</th>
+          <th>Concession</th>
+          <th>Net Eff.</th>
+          <th>Resident</th>
+          <th>User</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Reset filters ────────────────────────────────────────
+function resetAllFilters() {
+  ['state','metro','community','rm','cd'].forEach(id => {
+    const w = document.getElementById('ms-' + id);
+    w.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
+    w.querySelector('input[value="__all__"]').checked = true;
+    updateMsLabel(id);
+  });
+  document.querySelectorAll('#evtMsDropdown input').forEach(cb => cb.checked = true);
+  selectedEventTypes = new Set(EVENT_TYPE_ORDER);
+  document.getElementById('evtMsLabel').textContent = 'All Event Types';
+  document.getElementById('historySearch').value = '';
+  setDateShortcut(30);
+}
+
+// ── Unit timeline side panel ─────────────────────────────
+function openUnitTimeline(unitId) {
+  const events = LEASE_HISTORY_DATA.filter(e => e.unitId === unitId);
+  if (!events.length) return;
+  const first = events[0];
+  const comm = COMMUNITY_BY_ID[first.communityId];
+
+  // Resolve unit metadata from PRICING_DATA
+  let floorplan = '—', status = '—';
+  const commPricing = PRICING_DATA.find(c => c.id === first.communityId);
+  if (commPricing) {
+    for (const bt of commPricing.bedTypes) {
+      const u = bt.units.find(x => x.id === unitId);
+      if (u) { floorplan = u.floorplan; status = u.status; break; }
+    }
+  }
+
+  document.getElementById('timelineTitle').textContent = unitId;
+  document.getElementById('timelineSubtitle').innerHTML =
+    `<span>${comm.name}</span>` +
+    `<span style="color:var(--text-muted);">·</span>` +
+    `<span>${first.bedType || '—'}</span>` +
+    `<span style="color:var(--text-muted);">·</span>` +
+    `<span>${floorplan}</span>` +
+    `<span style="color:var(--text-muted);">·</span>` +
+    `<span style="text-transform:capitalize;">${status}</span>`;
+
+  // Group by event date (the calendar day the event happened).
+  const groups = {};
+  events.forEach(ev => {
+    const key = ev.eventDate.slice(0, 10);
+    (groups[key] = groups[key] || []).push(ev);
+  });
+  const sortedKeys = Object.keys(groups).sort().reverse();
+
+  let body = '';
+  sortedKeys.forEach(k => {
+    body += `<div class="tl-day-label">${formatDayLabel(k + 'T12:00:00Z')}</div>`;
+    groups[k].forEach(ev => {
+      const isLease = ev.eventType === 'new_lease_signed' || ev.eventType === 'renewal_signed';
+      const rowsHtml = [];
+      if (isLease) {
+        // In the timeline, every date surfaced below is projected (moveIn on new
+        // leases is scheduled, renewal effective is future, moveOut is lease-end
+        // estimate), so they all carry the muted-italic styling.
+        if (ev.moveInDate) {
+          rowsHtml.push(`<dt>Move-in Date</dt><dd class="date-projected">${formatEventDate(ev.moveInDate)}</dd>`);
+        }
+        if (ev.renewalEffectiveDate) {
+          rowsHtml.push(`<dt>Renewal Effective</dt><dd class="date-projected">${formatEventDate(ev.renewalEffectiveDate)}</dd>`);
+        }
+        if (ev.moveOutDate) {
+          rowsHtml.push(`<dt>Move-out (projected)</dt><dd class="date-projected">${formatEventDate(ev.moveOutDate)}</dd>`);
+        }
+        rowsHtml.push(`<dt>Lease Term</dt><dd>${ev.leaseTerm} mo</dd>`);
+        rowsHtml.push(`<dt>Gross Rent</dt><dd>${fmtUSD(ev.grossRent)}</dd>`);
+        rowsHtml.push(`<dt>Concession</dt><dd>${ev.concession ? ev.concession.description : '<span class="feed-muted">None</span>'}</dd>`);
+        rowsHtml.push(`<dt>Net Eff. Rent</dt><dd>${fmtUSD(ev.netEffRent)}</dd>`);
+      }
+      const details = rowsHtml.length ? `<dl class="tl-grid">${rowsHtml.join('')}</dl>` : '';
+      body += `
+        <div class="tl-card">
+          <div class="tl-card-head">
+            ${eventPill(ev.eventType)}
+            <span class="tl-card-resident">${ev.resident}</span>
+          </div>
+          ${details}
+          <div class="tl-user">by ${ev.user}</div>
+        </div>`;
+    });
+  });
+
+  document.getElementById('timelineBody').innerHTML = body;
+  document.getElementById('timelinePanel').classList.add('open');
+  document.getElementById('timelineBackdrop').classList.add('open');
+}
+function closeTimeline() {
+  document.getElementById('timelinePanel').classList.remove('open');
+  document.getElementById('timelineBackdrop').classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeTimeline();
+});
+
+// ── Init ─────────────────────────────────────────────────
+populateFilters();
+buildEventTypeMs();
+
+historyPicker = new DateRangePicker({
+  trigger: document.getElementById('historyRangeTrigger'),
+  labelEl: document.getElementById('historyRangeLabel'),
+  placeholder: 'Custom range',
+  onChange: (start, end) => {
+    if (start && end) {
+      // User committed a custom range — use full-day bounds so the range is
+      // inclusive of the selected end date's events, and turn off the
+      // currently-active shortcut pill.
+      dateFrom = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0);
+      dateTo   = new Date(end.getFullYear(),   end.getMonth(),   end.getDate(),   23, 59, 59);
+      document.querySelectorAll('#dateShortcuts button').forEach(b => b.classList.remove('active'));
+      renderFeed();
+    } else {
+      // User hit Clear inside the picker — fall back to the default 30-day
+      // shortcut (which internally calls setRange(null, null) silently).
+      setDateShortcut(30);
+    }
+  },
+});
+
+document.querySelectorAll('#dateShortcuts button').forEach(b => {
+  b.addEventListener('click', () => setDateShortcut(parseInt(b.dataset.days)));
+});
+renderFeed();
+</script>
+</body>
+</html>

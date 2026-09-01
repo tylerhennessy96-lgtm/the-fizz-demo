@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expiration Management — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="data.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+    <div class="nav-tabs">
+      <a href="pricing.html" class="nav-tab">Pricing</a>
+      <a href="expiration.html" class="nav-tab active">Expiration Management</a>
+      <a href="term.html" class="nav-tab">Term Management</a>
+      <a href="concessions.html" class="nav-tab">Concession Management</a>
+      <a href="rent-control.html" class="nav-tab">Rent Control</a>
+    </div>
+    <div class="nav-divider"></div>
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a>
+        <a href="history.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 11,10"/></svg>Lease History</a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Filter Bar ── -->
+  <div class="filter-bar" id="filterBar"></div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="table-wrap" id="expTableWrap">
+      <table class="data-table" id="expTable" style="width:100%;">
+        <thead>
+          <tr>
+            <th style="min-width:280px;position:sticky;left:0;background:var(--surface);z-index:11;">Community<span class="th-sub">Unit Type</span></th>
+            <th style="min-width:140px;text-align:center;">Adjustment<br><span class="th-sub">Count</span></th>
+            <th style="min-width:140px;text-align:center;">Rec.<br><span class="th-sub">Expiration</span></th>
+            <th style="min-width:160px;text-align:center;">Forecasted<br><span class="th-sub">Expiration</span></th>
+            <th style="min-width:120px;text-align:center;">Sum<br><span class="th-sub">Delta</span></th>
+            <th style="min-width:120px;text-align:center;">Max<br><span class="th-sub">Delta</span></th>
+          </tr>
+        </thead>
+        <tbody id="expBody"></tbody>
+      </table>
+    </div>
+
+    <!-- KPI Panel -->
+    <div class="exp-kpi-wrap" id="expKpiWrap">
+      <div class="panel-collapse-handle" onclick="toggleExpKpi()">
+        <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,5 7,9 11,5"/></svg>
+      </div>
+      <div class="exp-kpi-panel" id="expKpiPanel">
+        <div class="panel-header-bar" style="display:flex;align-items:center;height:44px;padding:0 16px;border-bottom:1px solid var(--nav-border);flex-shrink:0;">
+          <span style="font-size:14px;font-weight:600;color:#fff;">Expirations</span>
+          <span style="color:#3d4150;margin:0 10px;">|</span>
+          <span style="font-size:13px;color:#9ca3af;" id="kpiBedType"></span>
+          <span style="color:#3d4150;margin:0 10px;">|</span>
+          <span style="font-size:13px;color:#9ca3af;" id="kpiCommName"></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:16px;">
+            <div class="chart-legend" style="display:flex;gap:12px;">
+              <span class="legend-item"><span class="legend-dot" style="background:rgba(148,163,184,0.7);border-radius:2px;width:10px;height:10px;"></span>Rec. Expirations</span>
+              <span class="legend-item"><span class="legend-dot" style="background:rgba(232,0,125,0.7);border-radius:2px;width:10px;height:10px;"></span>Forecasted</span>
+              <span class="legend-item"><span class="legend-line" style="background:#3ecf8e;"></span>Rent Forecast</span>
+            </div>
+          </div>
+        </div>
+        <div style="padding:12px 16px;flex:1;position:relative;">
+          <div style="position:relative;width:100%;height:100%;"><canvas id="expKpiChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Expiration Detail Modal ── -->
+<div class="modal-backdrop" id="expModal">
+  <div class="modal" style="width:780px;max-height:80vh;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Expiration</div>
+        <div class="modal-subtitle" id="expModalSubtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('expModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;">
+      <table class="modal-table" id="expModalTable">
+        <thead style="position:sticky;top:0;background:var(--surface);">
+          <tr>
+            <th>Date</th>
+            <th style="text-align:right;">Rec. Exp.<br><span class="th-sub">Abs.</span></th>
+            <th style="text-align:right;">Rec. Exp.<br><span class="th-sub">Rel.</span></th>
+            <th style="text-align:right;">Forecasted<br><span class="th-sub">Abs.</span></th>
+            <th style="text-align:right;">Forecasted<br><span class="th-sub">Rel.</span></th>
+            <th style="text-align:right;">Delta</th>
+            <th style="text-align:center;">Manual<br><span class="th-sub">Premium</span></th>
+            <th style="text-align:center;">Rec.<br><span class="th-sub">Override</span></th>
+          </tr>
+        </thead>
+        <tbody id="expModalBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('expModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExpModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let expandedExpProps = new Set();
+let expKpiOpen = false;
+let expKpiChart = null;
+
+// ── Nav ──────────────────────────────────────────────────
+function toggleMenu() { document.getElementById('navDropdown').classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-btn') && !e.target.closest('.nav-dropdown'))
+    document.getElementById('navDropdown').classList.remove('open');
+});
+
+// ── Multi-Select Filters ──────────────────────────────────
+function buildMultiSelect(config) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ms-wrap'; wrap.id = 'ms-' + config.id;
+  wrap.innerHTML = `<button class="ms-trigger" onclick="toggleMs('${config.id}')"><span class="ms-label">${config.defaultLabel}</span><svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg></button><div class="ms-dropdown"><div class="ms-search"><input type="text" placeholder="Search..." oninput="filterMsOptions('${config.id}',this.value)"></div><div class="ms-options"><label class="ms-option ms-all"><input type="checkbox" value="__all__" checked onchange="toggleMsAll('${config.id}',this)"> All</label>${config.items.map(item=>`<label class="ms-option"><input type="checkbox" value="${item}" onchange="onMsChange('${config.id}')"> ${item}</label>`).join('')}</div></div>`;
+  return wrap;
+}
+function toggleMs(id) { document.querySelectorAll('.ms-wrap').forEach(w=>{if(w.id!=='ms-'+id)w.classList.remove('open');}); document.getElementById('ms-'+id).classList.toggle('open'); }
+function filterMsOptions(id,q) { const lo=q.toLowerCase(); document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all)').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(lo)?'':'none';}); }
+function toggleMsAll(id,cb) { document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all) input').forEach(c=>c.checked=false); cb.checked=true; onMsChange(id); saveFilterState(); updateClearBtn(); }
+function onMsChange(id) { const w=document.getElementById('ms-'+id); const ac=w.querySelector('.ms-all input'); if(![...w.querySelectorAll('.ms-option:not(.ms-all) input')].some(c=>c.checked)) ac.checked=true; else ac.checked=false; updateMsLabel(id); saveFilterState(); updateClearBtn(); renderExpTable(); }
+function getMsValues(id) { const w=document.getElementById('ms-'+id); if(w.querySelector('.ms-all input').checked) return []; return [...w.querySelectorAll('.ms-option:not(.ms-all) input:checked')].map(c=>c.value); }
+function updateMsLabel(id) { const w=document.getElementById('ms-'+id); const l=w.querySelector('.ms-label'); const d=w.querySelector('.ms-trigger').dataset.default; const v=getMsValues(id); if(!v.length) l.textContent=d; else if(v.length<=2) l.textContent=v.join(', '); else l.textContent=v.length+' '+d.replace('All ',''); }
+function saveFilterState() {
+  const state = {};
+  ['state','metro','community','rm','cd'].forEach(id => { state[id] = getMsValues(id); });
+  localStorage.setItem('smartrents_filters', JSON.stringify(state));
+}
+
+function restoreFilterState() {
+  try {
+    const saved = localStorage.getItem('smartrents_filters');
+    if (!saved) return;
+    const st = JSON.parse(saved);
+    ['state','metro','community','rm','cd'].forEach(filterId => {
+      const values = st[filterId];
+      if (!values || !values.length) return;
+      const wrap = document.getElementById('ms-' + filterId);
+      if (!wrap) return;
+      wrap.querySelectorAll('.ms-options input[type="checkbox"]').forEach(cb => {
+        if (cb.value === '__all__') return;
+        cb.checked = values.includes(cb.value);
+      });
+      const allCb = wrap.querySelector('input[value="__all__"]');
+      if (allCb) allCb.checked = false;
+      updateMsLabel(filterId);
+    });
+  } catch(e) { console.warn('Could not restore filters:', e); }
+}
+
+function clearAllFilters() {
+  ['state','metro','community','rm','cd'].forEach(filterId => {
+    const wrap = document.getElementById('ms-' + filterId);
+    if (!wrap) return;
+    wrap.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
+    const allCb = wrap.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(filterId);
+  });
+  localStorage.removeItem('smartrents_filters');
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.style.display = 'none';
+  renderPage();
+}
+
+function updateClearBtn() {
+  const hasFilters = ['state','metro','community','rm','cd'].some(id => getMsValues(id).length > 0);
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.style.display = hasFilters ? 'inline-block' : 'none';
+}
+
+function renderPage() { renderExpTable(); }
+
+function populateFilters() {
+  const bar = document.getElementById('filterBar'); bar.innerHTML = '';
+  [{id:'state',defaultLabel:'All States',items:['Texas','Florida','Georgia','North Carolina','Virginia','Arizona','Colorado']},{id:'metro',defaultLabel:'All Metros',items:[...new Set(COMMUNITIES.map(c=>c.metro))]},{id:'community',defaultLabel:'All Communities',items:COMMUNITIES.map(c=>c.name)},{id:'rm',defaultLabel:'All Revenue Managers',items:[...new Set(COMMUNITIES.map(c=>c.rm))]},{id:'cd',defaultLabel:'All Community Directors',items:[...new Set(COMMUNITIES.map(c=>c.cd))]}].forEach(cfg=>{const el=buildMultiSelect(cfg);el.querySelector('.ms-trigger').dataset.default=cfg.defaultLabel;bar.appendChild(el);});
+  // Add clear filters button
+  const clearBtn = document.createElement('button');
+  clearBtn.id = 'clearFiltersBtn';
+  clearBtn.onclick = clearAllFilters;
+  clearBtn.style.cssText = 'display:none;background:none;border:none;color:#6b7280;font-family:Inter,sans-serif;font-size:11.5px;cursor:pointer;padding:0 8px;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;';
+  clearBtn.textContent = 'Clear filters';
+  bar.appendChild(clearBtn);
+}
+document.addEventListener('click', e => { if(!e.target.closest('.ms-wrap')) document.querySelectorAll('.ms-wrap').forEach(w=>w.classList.remove('open')); });
+
+// ── Helpers ──────────────────────────────────────────────
+function getFilteredData() {
+  if (typeof EXPIRATION_DATA === 'undefined' || !EXPIRATION_DATA) return [];
+  const sf=getMsValues('state'),mf=getMsValues('metro'),cf=getMsValues('community'),rf=getMsValues('rm'),df=getMsValues('cd');
+  return EXPIRATION_DATA.filter(c=>{
+    if(sf.length&&!sf.includes(c.state))return false;
+    if(mf.length&&!mf.includes(c.metro))return false;
+    if(cf.length&&!cf.includes(c.name))return false;
+    if(rf.length&&!rf.includes(c.rm))return false;
+    if(df.length&&!df.includes(c.cd))return false;
+    return true;
+  });
+}
+
+function togglePropExp(commId) {
+  if(expandedExpProps.has(commId)) expandedExpProps.delete(commId);
+  else expandedExpProps.add(commId);
+  renderExpTable();
+}
+
+function formatPctInput(input) {
+  const val = parseFloat(input.value.replace(/[^0-9.]/g, ''));
+  input.value = isNaN(val) ? '' : val + '%';
+}
+
+// ── Render Table ─────────────────────────────────────────
+function renderExpTable() {
+  const tb = document.getElementById('expBody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  const data = getFilteredData();
+  if (!data || !data.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">No data available</td></tr>';
+    return;
+  }
+
+  data.forEach(comm => {
+    const propOpen = expandedExpProps.has(comm.id);
+
+    // Aggregate across all bed types
+    let totalRecExp = 0, totalForecasted = 0, adjCount = 0;
+    let worstDelta = 0;
+    comm.bedTypes.forEach(bt => {
+      bt.months.forEach(m => {
+        totalRecExp += m.recOverride ?? m.recAbs;
+        totalForecasted += m.forecastedAbs;
+        const d = m.forecastedAbs - (m.recOverride ?? m.recAbs);
+        if (Math.abs(d) > Math.abs(worstDelta)) worstDelta = d;
+        if (m.manualPremium !== null || m.recOverride !== null) adjCount++;
+      });
+    });
+    const totalDelta = totalForecasted - totalRecExp;
+    const absWorst = Math.abs(worstDelta);
+
+    const tr = document.createElement('tr');
+    tr.className = 'row-property';
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => togglePropExp(comm.id);
+    tr.innerHTML = `
+      <td style="position:sticky;left:0;background:#fff;z-index:5;font-weight:600;white-space:nowrap;">
+        <button class="expand-btn ${propOpen?'open':''}" style="pointer-events:none;">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
+        </button>${comm.name}
+      </td>
+      <td style="text-align:center;">${adjCount}</td>
+      <td style="text-align:center;">${totalRecExp}</td>
+      <td style="text-align:center;color:var(--text-secondary);">${totalForecasted}</td>
+      <td style="text-align:center;color:${totalDelta>0?'#e05252':'#15803d'};font-weight:600;">${totalDelta>0?'+':''}${totalDelta}</td>
+      <td style="text-align:center;color:${absWorst>3?'#e05252':absWorst>0?'#92400e':'#15803d'};font-weight:600;">${worstDelta>0?'+':''}${worstDelta}</td>
+    `;
+    tb.appendChild(tr);
+
+    if (!propOpen) return;
+
+    comm.bedTypes.forEach(bt => {
+      let btRec=0,btFor=0,btAdj=0,btWorst=0;
+      bt.months.forEach(m=>{
+        btRec+=m.recOverride??m.recAbs; btFor+=m.forecastedAbs;
+        const d=m.forecastedAbs-(m.recOverride??m.recAbs);
+        if(Math.abs(d)>Math.abs(btWorst))btWorst=d;
+        if(m.manualPremium!==null||m.recOverride!==null)btAdj++;
+      });
+      const btDelta=btFor-btRec;
+      const absBtWorst=Math.abs(btWorst);
+
+      const btr = document.createElement('tr');
+      btr.className = 'row-bedtype clickable';
+      btr.style.cursor = 'pointer';
+      btr.title = 'Click to view expiration detail';
+      btr.onclick = (e) => { if(!e.target.closest('button')) openExpModal(comm.id, bt.type); };
+      btr.innerHTML = `
+        <td style="position:sticky;left:0;background:#fafbfc;padding-left:28px;z-index:5;white-space:nowrap;font-weight:500;color:var(--text-primary);">${bt.type}<span style="color:var(--accent);margin-left:6px;font-size:11px;opacity:0.7;">\u2192</span></td>
+        <td style="text-align:center;">${btAdj}</td>
+        <td style="text-align:center;">${btRec}</td>
+        <td style="text-align:center;">
+          <button onclick="event.stopPropagation();openExpKpiPanel('${comm.id}','${bt.type}')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-weight:600;font-size:12.5px;text-decoration:underline;text-underline-offset:2px;padding:0;">${btFor}</button>
+        </td>
+        <td style="text-align:center;color:${btDelta>0?'#e05252':'#15803d'};font-weight:600;">${btDelta>0?'+':''}${btDelta}</td>
+        <td style="text-align:center;color:${absBtWorst>3?'#e05252':absBtWorst>0?'#92400e':'#15803d'};font-weight:600;">${btWorst>0?'+':''}${btWorst}</td>
+      `;
+      tb.appendChild(btr);
+    });
+  });
+}
+
+// ── Expiration Detail Modal ──────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); });
+});
+
+let expModalComm = null, expModalBt = null;
+
+function openExpModal(commId, btType) {
+  expModalComm = commId; expModalBt = btType;
+  const comm = EXPIRATION_DATA.find(c=>c.id===commId);
+  const bt = comm.bedTypes.find(b=>b.type===btType);
+  document.getElementById('expModalSubtitle').textContent = btType + ' | ' + comm.name;
+
+  document.getElementById('expModalBody').innerHTML = bt.months.map((m, i) => {
+    const rec = m.recOverride ?? m.recAbs;
+    const delta = m.forecastedAbs - rec;
+    const dc = delta>0?'#e05252':delta<0?'#16a34a':'var(--text-muted)';
+    const premVal = m.manualPremium !== null ? m.manualPremium : '';
+    const premBorder = m.manualPremium !== null ? '2px solid var(--accent)' : '1px solid var(--border-mid)';
+    const ovVal = m.recOverride !== null ? m.recOverride : '';
+    const ovBorder = m.recOverride !== null ? '2px solid var(--accent)' : '1px solid var(--border-mid)';
+    return `<tr style="${i%2?'background:#fafbfc':''}">
+      <td style="white-space:nowrap;">${m.monthLabel}</td>
+      <td style="text-align:right;">${rec}</td>
+      <td style="text-align:right;color:var(--text-muted);">${m.recRel.toFixed(1)}%</td>
+      <td style="text-align:right;">${m.forecastedAbs}</td>
+      <td style="text-align:right;color:var(--text-muted);">${m.forecastedRel.toFixed(1)}%</td>
+      <td style="text-align:right;font-weight:500;color:${dc};">${delta>0?'+':''}${delta}</td>
+      <td style="text-align:center;"><input type="text" value="${premVal?premVal+'%':''}" placeholder="&mdash;" oninput="onExpPremiumInput(this,'${commId}','${btType}',${i})" onblur="formatPctInput(this)" style="width:56px;text-align:center;border:${premBorder};border-radius:4px;padding:3px 6px;font-size:12px;font-family:'Inter',sans-serif;outline:none;"></td>
+      <td style="text-align:center;"><input type="text" value="${ovVal}" placeholder="&mdash;" oninput="onExpOverrideInput(this,'${commId}','${btType}',${i})" style="width:56px;text-align:center;border:${ovBorder};border-radius:4px;padding:3px 6px;font-size:12px;font-family:'Inter',sans-serif;outline:none;"></td>
+    </tr>`;
+  }).join('');
+  openModal('expModal');
+}
+
+function onExpPremiumInput(input, commId, btType, monthIdx) {
+  const raw = input.value.replace(/[^0-9.]/g, '');
+  input.value = raw;
+  const comm = EXPIRATION_DATA.find(c=>c.id===commId);
+  const bt = comm.bedTypes.find(b=>b.type===btType);
+  bt.months[monthIdx].manualPremium = raw ? parseFloat(raw) : null;
+  input.style.border = raw ? '2px solid var(--accent)' : '1px solid var(--border-mid)';
+}
+
+function onExpOverrideInput(input, commId, btType, monthIdx) {
+  const raw = input.value.replace(/[^0-9]/g, '');
+  input.value = raw;
+  const val = parseInt(raw);
+  const comm = EXPIRATION_DATA.find(c=>c.id===commId);
+  const bt = comm.bedTypes.find(b=>b.type===btType);
+  bt.months[monthIdx].recOverride = isNaN(val) ? null : val;
+  input.style.border = raw ? '2px solid var(--accent)' : '1px solid var(--border-mid)';
+  renderExpTable();
+}
+
+function saveExpModal() {
+  closeModal('expModal');
+  renderExpTable();
+  showToast('Expiration settings saved');
+}
+
+// ── KPI Panel ────────────────────────────────────────────
+function openExpKpiPanel(commId, btType) {
+  expKpiOpen = true;
+  document.getElementById('expKpiWrap').classList.remove('minimized');
+  renderExpKpiChart(commId, btType);
+}
+
+function toggleExpKpi() {
+  expKpiOpen = !expKpiOpen;
+  document.getElementById('expKpiWrap').classList.toggle('minimized', !expKpiOpen);
+}
+
+function closeExpKpi() {
+  expKpiOpen = false;
+  document.getElementById('expKpiWrap').classList.add('minimized');
+  if (expKpiChart) { expKpiChart.destroy(); expKpiChart = null; }
+}
+
+function renderExpKpiChart(commId, btType) {
+  const comm = EXPIRATION_DATA.find(c=>c.id===commId);
+  const bt = comm.bedTypes.find(b=>b.type===btType);
+  document.getElementById('kpiBedType').textContent = btType;
+  document.getElementById('kpiCommName').textContent = comm.name;
+
+  const labels = bt.months.map(m => {
+    const d = new Date(m.date);
+    return d.toLocaleString('en-US',{month:'short',year:'2-digit'});
+  });
+
+  if (expKpiChart) expKpiChart.destroy();
+  Chart.register(ChartDataLabels);
+
+  const dlConfig = {
+    display: true,
+    anchor: 'end',
+    align: 'end',
+    color: '#ffffff',
+    font: { family: 'Inter', size: 9, weight: '600' },
+    formatter: (value) => value > 0 ? value : '',
+    offset: -2,
+  };
+
+  expKpiChart = new Chart(document.getElementById('expKpiChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Rec. Expirations', data:bt.months.map(m=>m.recOverride??m.recAbs), backgroundColor:'rgba(148,163,184,0.5)', borderColor:'rgba(148,163,184,0.8)', borderWidth:1, borderRadius:3, yAxisID:'y', datalabels: dlConfig },
+        { label:'Forecasted Expirations', data:bt.months.map(m=>m.forecastedAbs), backgroundColor:'rgba(232,0,125,0.55)', borderColor:'rgba(232,0,125,0.85)', borderWidth:1, borderRadius:3, yAxisID:'y', datalabels: dlConfig },
+        { label:'Rent Forecast', data:bt.months.map(m=>m.rentForecast), type:'line', borderColor:'#3ecf8e', borderWidth:2.5, pointRadius:0, tension:0.4, yAxisID:'y2', fill:false, datalabels: { display: false } },
+      ]
+    },
+    options: {
+      animation:false, responsive:true, maintainAspectRatio:false,
+      layout: { padding: { top: 16 } },
+      plugins: {
+        datalabels: { display: false },
+        legend:{display:false},
+        tooltip:{
+          mode:'index',intersect:false,backgroundColor:'#1e2028',borderColor:'#3d4150',borderWidth:1,titleColor:'#e5e7eb',bodyColor:'#9ca3af',padding:10,
+          titleFont:{family:'Inter',size:12,weight:'600'},
+          bodyFont:{family:'Inter',size:11},
+          footerFont:{family:'Inter',size:11},
+          callbacks:{
+            label:ctx=>ctx.dataset.label==='Rent Forecast'?` Rent Forecast: $${ctx.parsed.y.toLocaleString()}`:`  ${ctx.dataset.label}: ${ctx.parsed.y} units`
+          }
+        }
+      },
+      scales: {
+        x:{ticks:{color:'#9ca3af',font:{family:'Inter',size:9},maxRotation:0},grid:{color:'rgba(255,255,255,0.06)'}},
+        y:{position:'left',title:{display:true,text:'Units',color:'#9ca3af',font:{family:'Inter',size:10}},ticks:{color:'#9ca3af',font:{family:'Inter',size:9}},grid:{color:'rgba(255,255,255,0.06)'},beginAtZero:true},
+        y2:{position:'right',title:{display:true,text:'$/month',color:'#9ca3af',font:{family:'Inter',size:10}},ticks:{color:'#9ca3af',font:{family:'Inter',size:9},callback:v=>'$'+v.toLocaleString()},grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+
+// ── Toast ────────────────────────────────────────────────
+function showToast(message) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'toast';
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;opacity:0;transition:opacity .2s;display:flex;align-items:center;gap:8px;';
+  el.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="2,7 5.5,10.5 12,3"/></svg>' + message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, 2500);
+}
+
+// ── Init ─────────────────────────────────────────────────
+try {
+  document.getElementById('expKpiWrap').classList.add('minimized');
+  populateFilters();
+  restoreFilterState();
+  updateClearBtn();
+  renderExpTable();
+} catch(e) {
+  console.error('Init error:', e);
+  const tb = document.getElementById('expBody');
+  if (tb) tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">Error loading data: ' + e.message + '</td></tr>';
+}
+</script>
+</body>
+</html>

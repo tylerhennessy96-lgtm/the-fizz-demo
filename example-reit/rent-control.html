@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rent Control — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="data.js"></script>
+  <style>
+    /* ── Unit filter row (secondary, below global filter bar) ─ */
+    .rc-unit-filter-row {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .rc-unit-search {
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 6px 10px 6px 30px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      color: var(--text-primary);
+      background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none' stroke='%239ca3af' stroke-width='1.5'%3E%3Ccircle cx='6' cy='6' r='4'/%3E%3Cline x1='9' y1='9' x2='12.5' y2='12.5'/%3E%3C/svg%3E") no-repeat 9px center;
+      width: 320px;
+      outline: none;
+    }
+    .rc-unit-search:focus { border-color: var(--accent); }
+    /* Community group header inside the unit dropdown. Renders against the
+       dark dropdown bg, so the muted-light text matches the option text tone. */
+    .ms-group-header {
+      padding: 7px 12px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      border-top: 1px solid #2a2d35;
+      pointer-events: none;
+    }
+    .ms-group-header:first-of-type { border-top: none; }
+
+    /* Visible-rule counter, shown next to Add Rule when a unit filter narrows */
+    .rc-counter { font-size: 12px; color: var(--text-muted); }
+    .rc-header-actions { display: flex; align-items: center; gap: 14px; }
+
+    /* ── Page layout ─────────────────────────────────────── */
+    .rc-page {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 36px 60px;
+      background: var(--body-bg);
+    }
+    .rc-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+    .rc-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+    .rc-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .rc-add-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .rc-add-btn:hover { background: var(--accent-dim); }
+
+    /* ── Rule list ───────────────────────────────────────── */
+    .rc-rule-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      /* Single grid template shared by the header row and every rule row so
+         columns stay aligned even as content width varies between rows. */
+      --rc-grid: minmax(180px, 1.6fr) minmax(200px, 1.6fr) minmax(200px, 1.4fr) 104px 80px minmax(140px, 1fr) 190px 72px;
+    }
+    .rc-rule-header {
+      display: grid;
+      grid-template-columns: var(--rc-grid);
+      align-items: center;
+      gap: 18px;
+      padding: 11px 20px;
+      background: #fafbfc;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .rc-rule-row {
+      display: grid;
+      grid-template-columns: var(--rc-grid);
+      align-items: center;
+      gap: 18px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    .rc-rule-row:last-child { border-bottom: none; }
+    .rc-rule-row:hover { background: #fafbfc; }
+    .rc-name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+    .rc-scope { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
+    .rc-max-formula  { font-size: 12.5px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
+    .rc-max-current  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; font-weight: 400; }
+    .rc-timeframe { font-size: 12.5px; color: var(--text-secondary); }
+    .rc-notice { font-size: 12.5px; color: var(--text-secondary); }
+    .rc-protections { font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; }
+    .rc-protections-empty { color: var(--text-muted); }
+    .rc-active { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+    .rc-active .rc-indefinite { color: var(--text-muted); font-style: italic; }
+    .rc-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .rc-icon-btn {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      padding: 5px;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+    .rc-icon-btn:hover { background: var(--row-hover); color: var(--accent); border-color: var(--border); }
+    .rc-icon-btn.rc-delete-btn:hover { color: var(--danger); }
+    .rc-icon-btn svg { width: 15px; height: 15px; }
+
+    /* ── Empty state ─────────────────────────────────────── */
+    .rc-empty {
+      padding: 56px 24px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .rc-empty-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+    .rc-empty-desc  { font-size: 13px; margin-bottom: 18px; }
+
+    /* ── Modal ───────────────────────────────────────────── */
+    .rc-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 500;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 5vh;
+    }
+    .rc-modal-backdrop.open { display: flex; }
+    .rc-modal {
+      width: min(95vw, 760px);
+      max-height: 85vh;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .rc-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .rc-modal-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .rc-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 22px;
+    }
+    .rc-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 14px 22px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Modal section headers ───────────────────────────── */
+    .rc-form-section { padding: 4px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .rc-form-section:last-child { border-bottom: none; margin-bottom: 0; }
+    .rc-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 12px;
+    }
+    /* Formula section is the visual anchor of the modal */
+    .rc-form-section.rc-formula-section {
+      background: #fafbfc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .rc-formula-preview {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+    .rc-formula-preview .rc-pre-label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 3px;
+    }
+    .rc-cpi-note {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .rc-sub-operand {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .rc-sub-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .rc-op-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+    .rc-op-row input.rc-number-input { padding: 6px 8px; }
+    /* Checkbox row */
+    .rc-check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+    .rc-check-row input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+    /* Inline label variant for short inputs */
+    .rc-inline { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+
+    /* ── Form fields in modal ────────────────────────────── */
+    .rc-field { margin-bottom: 16px; }
+    .rc-field-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .rc-field-required::after { content: ' *'; color: var(--accent); }
+    .rc-text-input,
+    .rc-number-input,
+    .rc-textarea,
+    .rc-select,
+    .rc-date-input {
+      width: 100%;
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--text-primary);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .12s;
+    }
+    .rc-text-input:focus,
+    .rc-number-input:focus,
+    .rc-textarea:focus,
+    .rc-select:focus,
+    .rc-date-input:focus { border-color: var(--accent); }
+    .rc-textarea { resize: vertical; min-height: 60px; font-family: 'Inter', sans-serif; }
+    .rc-field-inline { display: flex; gap: 10px; align-items: flex-start; }
+    .rc-field-inline > * { flex: 1; min-width: 0; }
+
+    /* Scope cascading multi-selects */
+    .rc-scope-ms { position: relative; }
+    .rc-scope-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .12s;
+    }
+    .rc-scope-trigger:hover:not(:disabled) { border-color: var(--accent); }
+    .rc-scope-trigger:disabled {
+      background: #f3f4f6;
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+    .rc-scope-trigger svg { color: var(--text-muted); flex-shrink: 0; }
+    .rc-scope-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      z-index: 10;
+      display: none;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+    .rc-scope-ms.open .rc-scope-dropdown { display: block; }
+    .rc-scope-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-size: 12.5px;
+      color: var(--text-primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .rc-scope-option:hover { background: var(--row-hover); }
+    .rc-scope-option input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+    .rc-scope-option.rc-scope-all {
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .rc-scope-empty { padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); font-style: italic; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+    <div class="nav-tabs">
+      <a href="pricing.html" class="nav-tab">Pricing</a>
+      <a href="expiration.html" class="nav-tab">Expiration Management</a>
+      <a href="term.html" class="nav-tab">Term Management</a>
+      <a href="concessions.html" class="nav-tab">Concession Management</a>
+      <a href="rent-control.html" class="nav-tab active">Rent Control</a>
+    </div>
+    <div class="nav-divider"></div>
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a>
+        <a href="history.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 11,10"/></svg>Lease History</a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="filter-bar" id="filterBar"></div>
+
+  <div class="rc-unit-filter-row">
+    <input type="search" id="unitSearch" class="rc-unit-search"
+           placeholder="Find unit by ID (e.g. WCC-004-2Bed-002)"
+           oninput="onUnitSearchInput()">
+    <div class="ms-wrap" id="ms-unit">
+      <button class="ms-trigger" onclick="toggleMs('unit')" data-default="All Units">
+        <span class="ms-label">All Units</span>
+        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+      <div class="ms-dropdown">
+        <div class="ms-search"><input type="text" placeholder="Search units..." oninput="filterMsOptions('unit',this.value)"></div>
+        <div class="ms-options" id="unitMsOptions"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rc-page">
+    <div class="rc-header">
+      <div>
+        <h1 class="rc-title">Rent Control</h1>
+        <div class="rc-subtitle">Configure rent increase rules that the pricing engine respects.</div>
+      </div>
+      <div class="rc-header-actions">
+        <span class="rc-counter" id="ruleCounter" style="display:none;"></span>
+        <button class="rc-add-btn" onclick="openRuleModal()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+          Add Rule
+        </button>
+      </div>
+    </div>
+
+    <div id="ruleList"></div>
+  </div>
+</div>
+
+<!-- Add / Edit Rule modal -->
+<div class="rc-modal-backdrop" id="ruleModalBackdrop">
+  <div class="rc-modal">
+    <div class="rc-modal-header">
+      <div class="rc-modal-title" id="ruleModalTitle">Add Rule</div>
+      <button class="modal-close" onclick="closeRuleModal()" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="rc-modal-body">
+      <!-- ── Basics ── -->
+      <div class="rc-form-section">
+        <div class="rc-section-title">Basics</div>
+        <div class="rc-field">
+          <label class="rc-field-label rc-field-required">Rule Name</label>
+          <input type="text" id="ruleName" class="rc-text-input" placeholder="e.g. California AB 1482 cap">
+        </div>
+        <div class="rc-field">
+          <label class="rc-field-label">Scope</label>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="rc-scope-ms" id="scopeCommMs">
+              <button type="button" class="rc-scope-trigger" onclick="toggleScopeMs('Comm')">
+                <span id="scopeCommLabel">All communities</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+              </button>
+              <div class="rc-scope-dropdown" id="scopeCommDropdown"></div>
+            </div>
+            <div class="rc-scope-ms" id="scopeBedMs">
+              <button type="button" class="rc-scope-trigger" id="scopeBedTrigger" onclick="toggleScopeMs('Bed')">
+                <span id="scopeBedLabel">All bed types</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+              </button>
+              <div class="rc-scope-dropdown" id="scopeBedDropdown"></div>
+            </div>
+            <div class="rc-scope-ms" id="scopeUnitMs">
+              <button type="button" class="rc-scope-trigger" id="scopeUnitTrigger" onclick="toggleScopeMs('Unit')">
+                <span id="scopeUnitLabel">All units</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+              </button>
+              <div class="rc-scope-dropdown" id="scopeUnitDropdown"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Increase formula ── -->
+      <div class="rc-form-section rc-formula-section">
+        <div class="rc-section-title">Increase formula</div>
+        <div class="rc-field">
+          <label class="rc-field-label rc-field-required">Calculation type</label>
+          <select id="calcType" class="rc-select" onchange="setCalcType(this.value)">
+            <option value="flat_pct">Flat percentage</option>
+            <option value="flat_dollar">Flat dollar amount</option>
+            <option value="cpi">CPI-based</option>
+            <option value="lesser_of">Lesser of two</option>
+            <option value="greater_of">Greater of two</option>
+          </select>
+        </div>
+        <div id="formulaInputs"></div>
+        <div class="rc-formula-preview">
+          <span class="rc-pre-label">Formula preview</span>
+          <div id="formulaSummary"></div>
+        </div>
+        <div class="rc-field-inline" style="margin-top:14px;">
+          <div class="rc-field">
+            <label class="rc-field-label">Ceiling (optional)</label>
+            <div class="rc-inline">
+              <input type="number" step="0.1" id="ceilingValue" class="rc-number-input" style="width:100px;" placeholder="e.g. 10" oninput="formCeiling = this.value === '' ? null : parseFloat(this.value); updateFormulaSummary();">
+              <span>%</span>
+            </div>
+          </div>
+          <div class="rc-field">
+            <label class="rc-field-label">Timeframe</label>
+            <select id="timeframe" class="rc-select">
+              <option value="12mo">per 12 months</option>
+              <option value="24mo">per 24 months</option>
+              <option value="lease_cycle">per lease cycle</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tenant protections ── -->
+      <div class="rc-form-section">
+        <div class="rc-section-title">Tenant protections</div>
+        <div class="rc-field">
+          <label class="rc-check-row">
+            <input type="checkbox" id="firstYearProtection" onchange="formFirstYear = this.checked;">
+            <span>No increase allowed in first 12 months of tenancy</span>
+          </label>
+        </div>
+        <div class="rc-field-inline">
+          <div class="rc-field">
+            <label class="rc-field-label">Notice period (days)</label>
+            <input type="number" id="noticeDays" class="rc-number-input" value="30" oninput="formNoticeDays = parseInt(this.value, 10) || 0;">
+          </div>
+          <div class="rc-field">
+            <label class="rc-field-label">Building age exemption (years)</label>
+            <input type="number" id="buildingAge" class="rc-number-input" placeholder="Leave blank for none" oninput="formBuildingAge = this.value === '' ? null : parseInt(this.value, 10);">
+          </div>
+        </div>
+        <div class="rc-field">
+          <label class="rc-field-label">Vacancy decontrol</label>
+          <select id="vacancyDecontrol" class="rc-select" onchange="onVacancyChange(this.value)">
+            <option value="none">None — same cap applies on turnover</option>
+            <option value="full">Full — reset to market on vacancy</option>
+            <option value="bonus">Vacancy bonus — partial reset</option>
+          </select>
+          <div id="vacancyBonusFields" style="display:none; margin-top:10px;">
+            <div class="rc-field-inline">
+              <div class="rc-field">
+                <label class="rc-field-label">Bonus (%)</label>
+                <input type="number" step="0.1" id="vacancyBonusPct" class="rc-number-input" placeholder="e.g. 10" oninput="formVacancyBonus = this.value === '' ? null : parseFloat(this.value);">
+              </div>
+              <div class="rc-field">
+                <label class="rc-field-label">Max total on vacancy (%)</label>
+                <input type="number" step="0.1" id="vacancyMaxTotalPct" class="rc-number-input" placeholder="e.g. 30" oninput="formVacancyMax = this.value === '' ? null : parseFloat(this.value);">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="rc-field">
+          <label class="rc-check-row">
+            <input type="checkbox" id="bankingAllowed" onchange="onBankingToggle(this.checked)">
+            <span>Allow banked (unused) increases to carry forward</span>
+          </label>
+          <div id="bankingMultiplierField" style="display:none; margin-top:10px;">
+            <label class="rc-field-label">Max banked amount (× annual cap)</label>
+            <div class="rc-inline">
+              <input type="number" step="0.1" id="bankingMaxMultiplier" class="rc-number-input" style="width:100px;" placeholder="e.g. 3" oninput="formBankingMax = this.value === '' ? null : parseFloat(this.value);">
+              <span>× annual cap</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Active dates & notes ── -->
+      <div class="rc-form-section">
+        <div class="rc-section-title">Active dates &amp; notes</div>
+        <div class="rc-field-inline">
+          <div class="rc-field">
+            <label class="rc-field-label rc-field-required">Active from</label>
+            <input type="date" id="activeFrom" class="rc-date-input">
+          </div>
+          <div class="rc-field">
+            <label class="rc-field-label">Active to</label>
+            <input type="date" id="activeTo" class="rc-date-input" placeholder="Leave blank for indefinite">
+          </div>
+        </div>
+        <div class="rc-field">
+          <label class="rc-field-label">Notes</label>
+          <textarea id="ruleNotes" class="rc-textarea" rows="2" placeholder="Optional context for this rule..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="rc-modal-footer">
+      <button class="btn btn-ghost" onclick="closeRuleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRule()">Save Rule</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants / lookups ──────────────────────────────────
+const COMMUNITY_BY_ID = {};
+COMMUNITIES.forEach(c => { COMMUNITY_BY_ID[c.id] = c; });
+const BED_TYPES = ['1 Bed', '2 Bed', '3 Bed'];
+const TIMEFRAME_LABEL = {
+  '12mo': 'per 12 months',
+  '24mo': 'per 24 months',
+  'lease_cycle': 'per lease cycle',
+};
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ── State ────────────────────────────────────────────────
+let editingRuleId = null;
+let formScope = { communityIds: 'all', bedTypes: 'all', unitIds: 'all' };
+// Formula state mirrors the rule's formula object. Defaults to a flat 5%.
+let formFormula = { type: 'flat_pct', value: 5 };
+let formCeiling = null;
+let formFirstYear = false;
+let formNoticeDays = 30;
+let formBuildingAge = null;
+let formVacancy = 'none';
+let formVacancyBonus = null;
+let formVacancyMax = null;
+let formBanking = false;
+let formBankingMax = null;
+
+// ── Nav menu ─────────────────────────────────────────────
+function toggleMenu() { document.getElementById('navDropdown').classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-btn') && !e.target.closest('.nav-dropdown')) {
+    document.getElementById('navDropdown').classList.remove('open');
+  }
+  if (!e.target.closest('.rc-scope-ms')) {
+    document.querySelectorAll('.rc-scope-ms.open').forEach(el => el.classList.remove('open'));
+  }
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-wrap.open, .ms-wrap').forEach(w => w.classList.remove('open'));
+  }
+});
+
+// ── Global filter pills (same pattern as parameters.html/history.html) ──
+function buildMultiSelect(config) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ms-wrap';
+  wrap.id = 'ms-' + config.id;
+  wrap.innerHTML = `
+    <button class="ms-trigger" onclick="toggleMs('${config.id}')">
+      <span class="ms-label">${config.defaultLabel}</span>
+      <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+    </button>
+    <div class="ms-dropdown">
+      <div class="ms-search"><input type="text" placeholder="Search..." oninput="filterMsOptions('${config.id}',this.value)"></div>
+      <div class="ms-options">
+        <label class="ms-option ms-all"><input type="checkbox" value="__all__" checked onchange="toggleMsAll('${config.id}',this)"> All</label>
+        ${config.items.map(item => `<label class="ms-option"><input type="checkbox" value="${item}" onchange="onMsChange('${config.id}')"> ${item}</label>`).join('')}
+      </div>
+    </div>`;
+  return wrap;
+}
+function toggleMs(id) {
+  document.querySelectorAll('.ms-wrap').forEach(w => { if (w.id !== 'ms-' + id) w.classList.remove('open'); });
+  document.getElementById('ms-' + id).classList.toggle('open');
+}
+function filterMsOptions(id, q) {
+  const lo = q.toLowerCase();
+  document.querySelectorAll('#ms-' + id + ' .ms-option:not(.ms-all)').forEach(o => {
+    o.style.display = o.textContent.toLowerCase().includes(lo) ? '' : 'none';
+  });
+}
+function toggleMsAll(id, cb) {
+  document.querySelectorAll('#ms-' + id + ' .ms-option:not(.ms-all) input').forEach(c => c.checked = false);
+  cb.checked = true;
+  onMsChange(id);
+}
+function onMsChange(id) {
+  const w = document.getElementById('ms-' + id);
+  const ac = w.querySelector('.ms-all input');
+  if (![...w.querySelectorAll('.ms-option:not(.ms-all) input')].some(c => c.checked)) ac.checked = true;
+  else ac.checked = false;
+  updateMsLabel(id);
+  updateClearBtn();
+  // Cascade: the unit multi-select's option list depends on which communities
+  // are in scope, so global community-affecting filters must rebuild it.
+  if (['state','metro','community','rm','cd'].includes(id)) rebuildUnitDropdown();
+  renderRuleList();
+}
+function getMsValues(id) {
+  const w = document.getElementById('ms-' + id);
+  if (!w) return [];
+  // The "All" row is injected dynamically for some wraps (e.g. the unit
+  // multi-select, which cascades off the community filter). If the wrap
+  // exists but its options haven't been built yet, treat it as "All".
+  const allCb = w.querySelector('.ms-all input');
+  if (!allCb || allCb.checked) return [];
+  return [...w.querySelectorAll('.ms-option:not(.ms-all) input:checked')].map(c => c.value);
+}
+function updateMsLabel(id) {
+  const w = document.getElementById('ms-' + id);
+  const l = w.querySelector('.ms-label');
+  const d = w.querySelector('.ms-trigger').dataset.default;
+  const v = getMsValues(id);
+  if (!v.length) l.textContent = d;
+  else if (v.length <= 2) l.textContent = v.join(', ');
+  else l.textContent = v.length + ' ' + d.replace('All ', '');
+}
+function populateFilters() {
+  const bar = document.getElementById('filterBar');
+  bar.innerHTML = '';
+  [
+    { id:'state',     defaultLabel:'All States',              items:['Texas','Florida','Georgia','North Carolina','Virginia','Arizona','Colorado'] },
+    { id:'metro',     defaultLabel:'All Metros',              items:[...new Set(COMMUNITIES.map(c => c.metro))] },
+    { id:'community', defaultLabel:'All Communities',         items:COMMUNITIES.map(c => c.name) },
+    { id:'rm',        defaultLabel:'All Revenue Managers',    items:[...new Set(COMMUNITIES.map(c => c.rm))] },
+    { id:'cd',        defaultLabel:'All Community Directors', items:[...new Set(COMMUNITIES.map(c => c.cd))] },
+  ].forEach(cfg => {
+    const el = buildMultiSelect(cfg);
+    el.querySelector('.ms-trigger').dataset.default = cfg.defaultLabel;
+    bar.appendChild(el);
+  });
+  const clearBtn = document.createElement('button');
+  clearBtn.id = 'clearFiltersBtn';
+  clearBtn.onclick = clearAllFilters;
+  clearBtn.style.cssText = 'display:none;background:none;border:none;color:#6b7280;font-family:Inter,sans-serif;font-size:11.5px;cursor:pointer;padding:0 8px;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;';
+  clearBtn.textContent = 'Clear filters';
+  bar.appendChild(clearBtn);
+}
+function clearAllFilters() {
+  ['state','metro','community','rm','cd'].forEach(id => {
+    const w = document.getElementById('ms-' + id);
+    if (!w) return;
+    w.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
+    const allCb = w.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(id);
+  });
+  updateClearBtn();
+  rebuildUnitDropdown();
+  renderRuleList();
+}
+
+// Resets just the unit search + unit multi-select. Leaves global filters alone.
+function clearUnitFilters() {
+  document.getElementById('unitSearch').value = '';
+  const w = document.getElementById('ms-unit');
+  if (w) {
+    w.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
+    const allCb = w.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel('unit');
+  }
+  renderRuleList();
+}
+function onUnitSearchInput() { renderRuleList(); }
+function updateClearBtn() {
+  const hasFilters = ['state','metro','community','rm','cd'].some(id => getMsValues(id).length > 0);
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.style.display = hasFilters ? 'inline-block' : 'none';
+}
+
+// Returns the community IDs surviving the current global filters. When no
+// filters are active this returns every community ID.
+function getFilteredCommunityIds() {
+  const sf = getMsValues('state'), mf = getMsValues('metro'),
+        cf = getMsValues('community'), rf = getMsValues('rm'), df = getMsValues('cd');
+  return COMMUNITIES.filter(c => {
+    if (sf.length && !sf.includes(c.state))  return false;
+    if (mf.length && !mf.includes(c.metro))  return false;
+    if (cf.length && !cf.includes(c.name))   return false;
+    if (rf.length && !rf.includes(c.rm))     return false;
+    if (df.length && !df.includes(c.cd))     return false;
+    return true;
+  }).map(c => c.id);
+}
+
+// Rules are included when they apply portfolio-wide, OR their scope touches
+// at least one community in the filtered set. Bed-type / unit scoping rides
+// on its parent community — if that community is in the filtered set, the
+// rule is in scope regardless of bed-type / unit narrowing.
+function getFilteredRules() {
+  const anyFilterActive = ['state','metro','community','rm','cd'].some(id => getMsValues(id).length > 0);
+  if (!anyFilterActive) return RENT_CONTROL_RULES;
+  const allowed = new Set(getFilteredCommunityIds());
+  return RENT_CONTROL_RULES.filter(r => {
+    if (r.scope.communityIds === 'all') return true;
+    return r.scope.communityIds.some(id => allowed.has(id));
+  });
+}
+
+// ── Unit-level filter (search + multi-select) ────────────
+
+// Flat lookup of every unit in PRICING_DATA keyed by unit id.
+const UNIT_INDEX = (() => {
+  const idx = {};
+  PRICING_DATA.forEach(comm => {
+    comm.bedTypes.forEach(bt => {
+      bt.units.forEach(u => { idx[u.id] = { id: u.id, commId: comm.id, commName: comm.name, bedType: bt.type }; });
+    });
+  });
+  return idx;
+})();
+
+// Does a rule's *scope* cover a specific (comm, bed type, unit) triple?
+// Mirrors the scope-matching half of getActiveRcRulesForUnit — no active-date
+// check, because the rule list shows rules regardless of their active window.
+function ruleCoversUnit(rule, commId, bedType, unitId) {
+  const s = rule.scope;
+  if (s.communityIds !== 'all' && !s.communityIds.includes(commId)) return false;
+  if (s.bedTypes     !== 'all' && !s.bedTypes.includes(bedType))    return false;
+  if (s.unitIds      !== 'all' && !s.unitIds.includes(unitId))      return false;
+  return true;
+}
+
+// Returns the set of target unit IDs derived from the search input and the
+// unit multi-select. Returns null when no unit filter is active.
+function getUnitFilterTargets() {
+  const search = document.getElementById('unitSearch')?.value.trim().toLowerCase() ?? '';
+  const selected = getMsValues('unit');
+  if (!search && !selected.length) return null;
+  const targets = new Set();
+  if (search) {
+    Object.values(UNIT_INDEX).forEach(u => {
+      if (u.id.toLowerCase().includes(search)) targets.add(u.id);
+    });
+  }
+  selected.forEach(id => targets.add(id));
+  return targets;
+}
+
+// The final rule list: globally filtered rules, then narrowed further by unit
+// targets when a unit filter is active.
+function getVisibleRules() {
+  const base = getFilteredRules();
+  const targets = getUnitFilterTargets();
+  if (!targets) return base;
+  return base.filter(r => {
+    for (const uid of targets) {
+      const u = UNIT_INDEX[uid];
+      if (u && ruleCoversUnit(r, u.commId, u.bedType, u.id)) return true;
+    }
+    return false;
+  });
+}
+
+function isUnitFilterActive() {
+  const s = document.getElementById('unitSearch')?.value.trim() ?? '';
+  return s.length > 0 || getMsValues('unit').length > 0;
+}
+
+// Builds the unit multi-select dropdown content. Cascades off the global
+// community filter — only units whose parent community survives the global
+// filters appear. Units are grouped by community with a small header above
+// each group. Previously-checked values that survive the narrowing stay
+// checked; ones that got pruned are dropped silently.
+function rebuildUnitDropdown() {
+  const options = document.getElementById('unitMsOptions');
+  if (!options) return;
+
+  const prev = new Set(getMsValues('unit'));
+  const allowedCommIds = new Set(getFilteredCommunityIds());
+
+  // Group units by community, preserving PRICING_DATA order.
+  const groups = [];
+  PRICING_DATA.forEach(comm => {
+    if (!allowedCommIds.has(comm.id)) return;
+    const bucket = { commName: comm.name, units: [] };
+    comm.bedTypes.forEach(bt => bt.units.forEach(u => bucket.units.push(u.id)));
+    if (bucket.units.length) groups.push(bucket);
+  });
+
+  const allIds = new Set(groups.flatMap(g => g.units));
+  const stillChecked = [...prev].filter(id => allIds.has(id));
+  const allActive = stillChecked.length === 0;
+
+  let html = `<label class="ms-option ms-all"><input type="checkbox" value="__all__" ${allActive ? 'checked' : ''} onchange="toggleMsAll('unit',this)"> All</label>`;
+  groups.forEach(g => {
+    html += `<div class="ms-group-header">${escapeHtml(g.commName)}</div>`;
+    g.units.forEach(uid => {
+      const checked = !allActive && stillChecked.includes(uid);
+      html += `<label class="ms-option"><input type="checkbox" value="${uid}" ${checked ? 'checked' : ''} onchange="onMsChange('unit')"> ${uid}</label>`;
+    });
+  });
+  options.innerHTML = html;
+  updateMsLabel('unit');
+}
+
+function updateRuleCounter(visible, total) {
+  const el = document.getElementById('ruleCounter');
+  if (!el) return;
+  if (isUnitFilterActive()) {
+    el.textContent = `Showing ${visible} of ${total} rules`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+    el.textContent = '';
+  }
+}
+
+// ── Scope summary ────────────────────────────────────────
+function computeScopeSummary(scope) {
+  const commAll = scope.communityIds === 'all';
+  const bedAll  = scope.bedTypes === 'all';
+  const unitAll = scope.unitIds === 'all';
+
+  // Left side: community portion
+  let left;
+  if (commAll) {
+    left = 'Portfolio-wide';
+  } else if (scope.communityIds.length === 1) {
+    left = COMMUNITY_BY_ID[scope.communityIds[0]]?.name ?? scope.communityIds[0];
+  } else {
+    left = `${scope.communityIds.length} communities`;
+  }
+
+  // Right side: bed types + units
+  let right;
+  if (!unitAll) {
+    // Specific unit(s) take precedence in the summary
+    right = scope.unitIds.length === 1
+      ? `Unit ${scope.unitIds[0]}`
+      : `${scope.unitIds.length} units`;
+  } else if (bedAll) {
+    right = 'All units';
+  } else if (scope.bedTypes.length === 1) {
+    right = `${scope.bedTypes[0]} only`;
+  } else {
+    right = scope.bedTypes.join(' & ');
+  }
+  return `${left} · ${right}`;
+}
+
+// ── Format helpers ───────────────────────────────────────
+function trimDecimal(n) { return Number(n).toFixed(1).replace(/\.0$/, ''); }
+
+// Render a formula tree as plain-English text.
+function formatFormula(f) {
+  if (!f) return '—';
+  switch (f.type) {
+    case 'flat_pct':    return trimDecimal(f.value) + '%';
+    case 'flat_dollar': return '$' + Math.round(f.value);
+    case 'cpi': {
+      const m = f.cpiMultiplier, a = f.cpiAddition || 0;
+      const base = m === 100 ? 'CPI' : m + '% of CPI';
+      if (a > 0) return base + ' + ' + trimDecimal(a) + '%';
+      if (a < 0) return base + ' − ' + trimDecimal(Math.abs(a)) + '%';
+      return base;
+    }
+    case 'lesser_of':
+    case 'greater_of': {
+      const op = f.type === 'lesser_of' ? 'Lesser' : 'Greater';
+      return `${op} of (${formatFormula(f.operands[0])}) or ${formatFormula(f.operands[1])}`;
+    }
+  }
+  return '—';
+}
+
+// Evaluate a formula against a given CPI. Returns { pct, dollar } (either/both
+// populated depending on formula shape).
+function computeFormulaValue(f, cpi) {
+  if (!f) return {};
+  switch (f.type) {
+    case 'flat_pct':    return { pct: f.value };
+    case 'flat_dollar': return { dollar: f.value };
+    case 'cpi':         return { pct: (f.cpiMultiplier / 100) * cpi + (f.cpiAddition || 0) };
+    case 'lesser_of':
+    case 'greater_of': {
+      const [a, b] = f.operands.map(o => computeFormulaValue(o, cpi));
+      // When both operands are same-type percents we can genuinely compare
+      // and pick min/max. When they're mixed units we can't, so return both
+      // for side-by-side display.
+      if (a.pct != null && b.pct != null) {
+        const pick = f.type === 'lesser_of' ? Math.min : Math.max;
+        return { pct: pick(a.pct, b.pct) };
+      }
+      return { ...a, ...b };
+    }
+  }
+  return {};
+}
+
+// Applies the optional flat ceiling to a result (only meaningful for percents).
+function applyCeiling(result, ceiling) {
+  if (ceiling == null || result.pct == null) return result;
+  return { ...result, pct: Math.min(result.pct, ceiling) };
+}
+
+// True when computing the effective cap depends on CPI (so "Currently: X%"
+// should be shown under the formula in the list).
+function hasCpiComponent(f) {
+  if (!f) return false;
+  if (f.type === 'cpi') return true;
+  if (f.type === 'lesser_of' || f.type === 'greater_of') return f.operands.some(hasCpiComponent);
+  return false;
+}
+
+// Renders the computed current cap after applying CPI and ceiling.
+function formatEffectiveCap(formula, ceiling, cpi) {
+  const v = applyCeiling(computeFormulaValue(formula, cpi), ceiling);
+  if (v.pct != null && v.dollar != null) return `${trimDecimal(v.pct)}% or $${Math.round(v.dollar)}`;
+  if (v.pct != null)    return trimDecimal(v.pct) + '%';
+  if (v.dollar != null) return '$' + Math.round(v.dollar);
+  return '—';
+}
+
+function formatShortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+}
+function formatActiveRange(rule) {
+  const from = formatShortDate(rule.activeFrom);
+  const to = rule.activeTo ? formatShortDate(rule.activeTo) : '<span class="rc-indefinite">indefinite</span>';
+  return `${from} – ${to}`;
+}
+
+// ── Render rule list ─────────────────────────────────────
+function renderRuleList() {
+  const container = document.getElementById('ruleList');
+
+  if (!RENT_CONTROL_RULES.length) {
+    updateRuleCounter(0, 0);
+    container.innerHTML = `
+      <div class="rc-rule-list">
+        <div class="rc-empty">
+          <div class="rc-empty-title">No rent control rules configured</div>
+          <div class="rc-empty-desc">Add a rule to cap renewal and new-lease price increases.</div>
+          <button class="rc-add-btn" onclick="openRuleModal()">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+            Add Rule
+          </button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const visibleRules = getVisibleRules();
+  updateRuleCounter(visibleRules.length, RENT_CONTROL_RULES.length);
+
+  if (!visibleRules.length) {
+    // Two distinct empty states: unit-filter-driven vs global-filter-driven.
+    // The unit one offers a partial reset that preserves the global context.
+    if (isUnitFilterActive()) {
+      container.innerHTML = `
+        <div class="rc-rule-list">
+          <div class="rc-empty">
+            <div class="rc-empty-title">No rent control rules apply to the specified unit(s).</div>
+            <button class="btn btn-ghost" onclick="clearUnitFilters()">Clear unit filters</button>
+          </div>
+        </div>`;
+    } else {
+      container.innerHTML = `
+        <div class="rc-rule-list">
+          <div class="rc-empty">
+            <div class="rc-empty-title">No rent control rules match the current filters</div>
+            <div class="rc-empty-desc">Try clearing filters or widening the community scope.</div>
+            <button class="btn btn-ghost" onclick="clearAllFilters()">Clear filters</button>
+          </div>
+        </div>`;
+    }
+    return;
+  }
+
+  const rows = visibleRules.map(rule => {
+    const formulaText = formatFormula(rule.formula) + (rule.ceiling != null ? `, capped at ${rule.ceiling}%` : '');
+    const showCurrent = hasCpiComponent(rule.formula) || (rule.ceiling != null && hasCpiComponent(rule.formula));
+    const maxCell = `
+      <div>
+        <div class="rc-max-formula">${escapeHtml(formulaText)}</div>
+        ${showCurrent ? `<div class="rc-max-current">Currently: ${escapeHtml(formatEffectiveCap(rule.formula, rule.ceiling, CURRENT_CPI))}</div>` : ''}
+      </div>`;
+
+    const noticeDays = rule.noticePeriodDays ?? 30;
+    const noticeCell = `<div class="rc-notice">${noticeDays} days</div>`;
+
+    // Compact inline list of enabled protections, middot-separated. Matches
+    // the order in the edit modal: first-year → vacancy → banking.
+    const protections = [];
+    if (rule.firstYearProtection) protections.push('1st yr');
+    if (rule.vacancyDecontrol === 'full')  protections.push('Vac. decontrol');
+    if (rule.vacancyDecontrol === 'bonus') protections.push('Vac. bonus');
+    if (rule.bankingAllowed)      protections.push('Banking');
+    const protectionsCell = `<div class="rc-protections">${
+      protections.length
+        ? escapeHtml(protections.join(' · '))
+        : '<span class="rc-protections-empty">—</span>'
+    }</div>`;
+
+    return `
+    <div class="rc-rule-row">
+      <div class="rc-name">${escapeHtml(rule.name)}</div>
+      <div class="rc-scope">${escapeHtml(computeScopeSummary(rule.scope))}</div>
+      ${maxCell}
+      <div class="rc-timeframe">${TIMEFRAME_LABEL[rule.timeframe] ?? rule.timeframe}</div>
+      ${noticeCell}
+      ${protectionsCell}
+      <div class="rc-active">${formatActiveRange(rule)}</div>
+      <div class="rc-actions">
+        <button class="rc-icon-btn" onclick="openRuleModal('${rule.id}')" title="Edit">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2l3 3-7 7H2v-3L9 2z"/></svg>
+        </button>
+        <button class="rc-icon-btn rc-delete-btn" onclick="deleteRule('${rule.id}')" title="Delete">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,4 12,4"/><path d="M4 4V2.5A1 1 0 0 1 5 1.5h4a1 1 0 0 1 1 1V4"/><path d="M3 4l1 8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l1-8"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  const header = `
+    <div class="rc-rule-header">
+      <div>Rule Name</div>
+      <div>Scope</div>
+      <div>Max Increase</div>
+      <div>Timeframe</div>
+      <div>Notice</div>
+      <div>Protections</div>
+      <div>Active</div>
+      <div></div>
+    </div>`;
+
+  container.innerHTML = `<div class="rc-rule-list">${header}${rows}</div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// ── Scope multi-selects (cascading) ──────────────────────
+// `which` is 'Comm' | 'Bed' | 'Unit'.
+function toggleScopeMs(which) {
+  const wrap = document.getElementById('scope' + which + 'Ms');
+  const wasOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.rc-scope-ms.open').forEach(el => el.classList.remove('open'));
+  if (!wasOpen) wrap.classList.add('open');
+}
+
+function buildCommDropdown() {
+  const dd = document.getElementById('scopeCommDropdown');
+  const isAll = formScope.communityIds === 'all';
+  dd.innerHTML =
+    `<label class="rc-scope-option rc-scope-all"><input type="checkbox" ${isAll ? 'checked' : ''} onchange="selectScopeAll('Comm')"> All communities</label>` +
+    COMMUNITIES.map(c => {
+      const checked = !isAll && formScope.communityIds.includes(c.id);
+      return `<label class="rc-scope-option"><input type="checkbox" value="${c.id}" ${checked ? 'checked' : ''} onchange="onCommChange(this)"> ${escapeHtml(c.name)}</label>`;
+    }).join('');
+}
+
+function buildBedDropdown() {
+  const dd = document.getElementById('scopeBedDropdown');
+  const isAll = formScope.bedTypes === 'all';
+  dd.innerHTML =
+    `<label class="rc-scope-option rc-scope-all"><input type="checkbox" ${isAll ? 'checked' : ''} onchange="selectScopeAll('Bed')"> All bed types</label>` +
+    BED_TYPES.map(bt => {
+      const checked = !isAll && formScope.bedTypes.includes(bt);
+      return `<label class="rc-scope-option"><input type="checkbox" value="${bt}" ${checked ? 'checked' : ''} onchange="onBedChange(this)"> ${bt}</label>`;
+    }).join('');
+}
+
+function buildUnitDropdown() {
+  const dd = document.getElementById('scopeUnitDropdown');
+  const trigger = document.getElementById('scopeUnitTrigger');
+  // Units require specific bed types (otherwise the scope is too broad)
+  if (formScope.bedTypes === 'all') {
+    trigger.disabled = true;
+    dd.innerHTML = `<div class="rc-scope-empty">Narrow bed types first to pick specific units.</div>`;
+    return;
+  }
+  trigger.disabled = false;
+
+  const commIds = formScope.communityIds === 'all'
+    ? COMMUNITIES.map(c => c.id)
+    : formScope.communityIds;
+  const bts = formScope.bedTypes;
+
+  const candidates = [];
+  PRICING_DATA.forEach(comm => {
+    if (!commIds.includes(comm.id)) return;
+    comm.bedTypes.forEach(bt => {
+      if (!bts.includes(bt.type)) return;
+      bt.units.forEach(u => {
+        candidates.push({ id: u.id, commName: comm.name });
+      });
+    });
+  });
+
+  const isAll = formScope.unitIds === 'all';
+  let html = `<label class="rc-scope-option rc-scope-all"><input type="checkbox" ${isAll ? 'checked' : ''} onchange="selectScopeAll('Unit')"> All units in scope</label>`;
+  if (!candidates.length) {
+    html += `<div class="rc-scope-empty">No units match the current community + bed-type selection.</div>`;
+  } else {
+    html += candidates.map(u => {
+      const checked = !isAll && formScope.unitIds.includes(u.id);
+      return `<label class="rc-scope-option"><input type="checkbox" value="${u.id}" ${checked ? 'checked' : ''} onchange="onUnitChange(this)"> <span style="font-family:'JetBrains Mono',monospace;font-size:12px;">${u.id}</span></label>`;
+    }).join('');
+  }
+  dd.innerHTML = html;
+}
+
+function updateScopeLabels() {
+  document.getElementById('scopeCommLabel').textContent =
+    formScope.communityIds === 'all' ? 'All communities'
+    : formScope.communityIds.length === 1 ? (COMMUNITY_BY_ID[formScope.communityIds[0]]?.name ?? '1 community')
+    : `${formScope.communityIds.length} communities`;
+
+  document.getElementById('scopeBedLabel').textContent =
+    formScope.bedTypes === 'all' ? 'All bed types'
+    : formScope.bedTypes.length === 1 ? formScope.bedTypes[0]
+    : `${formScope.bedTypes.length} bed types`;
+
+  const unitTrigger = document.getElementById('scopeUnitTrigger');
+  if (formScope.bedTypes === 'all') {
+    document.getElementById('scopeUnitLabel').textContent = 'All units';
+  } else {
+    document.getElementById('scopeUnitLabel').textContent =
+      formScope.unitIds === 'all' ? 'All units in scope'
+      : formScope.unitIds.length === 1 ? formScope.unitIds[0]
+      : `${formScope.unitIds.length} units`;
+  }
+}
+
+function selectScopeAll(which) {
+  if (which === 'Comm') {
+    formScope.communityIds = 'all';
+    // Clearing community scope should also clear dependent unit picks,
+    // since "all communities" means units are narrowed by bed type alone.
+    formScope.unitIds = 'all';
+    buildCommDropdown();
+    buildUnitDropdown();
+  } else if (which === 'Bed') {
+    formScope.bedTypes = 'all';
+    formScope.unitIds = 'all';
+    buildBedDropdown();
+    buildUnitDropdown();
+  } else {
+    formScope.unitIds = 'all';
+    buildUnitDropdown();
+  }
+  updateScopeLabels();
+}
+
+function onCommChange(cb) {
+  // Flip from "all" to a specific list when the user picks anything
+  if (formScope.communityIds === 'all') formScope.communityIds = [];
+  if (cb.checked) {
+    if (!formScope.communityIds.includes(cb.value)) formScope.communityIds.push(cb.value);
+  } else {
+    formScope.communityIds = formScope.communityIds.filter(id => id !== cb.value);
+  }
+  // If everything ends up unchecked, revert to "all"
+  if (!formScope.communityIds.length) formScope.communityIds = 'all';
+  // Narrowing communities may invalidate unit picks
+  if (Array.isArray(formScope.unitIds)) {
+    const allowedIds = new Set();
+    PRICING_DATA.forEach(comm => {
+      if (formScope.communityIds === 'all' || formScope.communityIds.includes(comm.id)) {
+        comm.bedTypes.forEach(bt => bt.units.forEach(u => allowedIds.add(u.id)));
+      }
+    });
+    formScope.unitIds = formScope.unitIds.filter(id => allowedIds.has(id));
+    if (!formScope.unitIds.length) formScope.unitIds = 'all';
+  }
+  buildCommDropdown();
+  buildUnitDropdown();
+  updateScopeLabels();
+}
+
+function onBedChange(cb) {
+  if (formScope.bedTypes === 'all') formScope.bedTypes = [];
+  if (cb.checked) {
+    if (!formScope.bedTypes.includes(cb.value)) formScope.bedTypes.push(cb.value);
+  } else {
+    formScope.bedTypes = formScope.bedTypes.filter(bt => bt !== cb.value);
+  }
+  if (!formScope.bedTypes.length) formScope.bedTypes = 'all';
+  // Narrowing bed types may invalidate unit picks
+  if (Array.isArray(formScope.unitIds) && formScope.bedTypes !== 'all') {
+    formScope.unitIds = formScope.unitIds.filter(uid => {
+      return formScope.bedTypes.some(bt => uid.includes('-' + bt.replace(' ', '') + '-'));
+    });
+    if (!formScope.unitIds.length) formScope.unitIds = 'all';
+  } else if (formScope.bedTypes === 'all') {
+    // Units are gated behind bed types; reset when user re-opens to "all"
+    formScope.unitIds = 'all';
+  }
+  buildBedDropdown();
+  buildUnitDropdown();
+  updateScopeLabels();
+}
+
+function onUnitChange(cb) {
+  if (formScope.unitIds === 'all') formScope.unitIds = [];
+  if (cb.checked) {
+    if (!formScope.unitIds.includes(cb.value)) formScope.unitIds.push(cb.value);
+  } else {
+    formScope.unitIds = formScope.unitIds.filter(id => id !== cb.value);
+  }
+  if (!formScope.unitIds.length) formScope.unitIds = 'all';
+  buildUnitDropdown();
+  updateScopeLabels();
+}
+
+// ── Formula builder ──────────────────────────────────────
+// Swapping the calculation type resets the formula to sensible defaults so
+// each type's inputs start in a valid state.
+function setCalcType(newType) {
+  if (newType === 'flat_pct')    formFormula = { type:'flat_pct', value: 5 };
+  else if (newType === 'flat_dollar') formFormula = { type:'flat_dollar', value: 150 };
+  else if (newType === 'cpi')    formFormula = { type:'cpi', cpiMultiplier: 100, cpiAddition: 0 };
+  else if (newType === 'lesser_of' || newType === 'greater_of') {
+    formFormula = {
+      type: newType,
+      operands: [
+        { type:'cpi', cpiMultiplier: 100, cpiAddition: 5 },
+        { type:'flat_pct', value: 10 },
+      ],
+    };
+  }
+  document.getElementById('calcType').value = newType;
+  buildFormulaInputs();
+}
+
+function buildFormulaInputs() {
+  const box = document.getElementById('formulaInputs');
+  const f = formFormula;
+  const cpiNote = `<div class="rc-cpi-note">Current CPI: ${CURRENT_CPI.toFixed(1)}%. Rules recalculate automatically when CPI is updated.</div>`;
+
+  if (f.type === 'flat_pct') {
+    box.innerHTML = `
+      <div class="rc-op-row">
+        <input type="number" step="0.1" value="${f.value}" class="rc-number-input" style="width:110px;"
+               oninput="formFormula.value = parseFloat(this.value) || 0; updateFormulaSummary();">
+        <span>%</span>
+      </div>`;
+  } else if (f.type === 'flat_dollar') {
+    box.innerHTML = `
+      <div class="rc-op-row">
+        <span>$</span>
+        <input type="number" value="${f.value}" class="rc-number-input" style="width:110px;"
+               oninput="formFormula.value = parseFloat(this.value) || 0; updateFormulaSummary();">
+      </div>`;
+  } else if (f.type === 'cpi') {
+    box.innerHTML = `
+      <div class="rc-op-row">
+        <input type="number" value="${f.cpiMultiplier}" class="rc-number-input" style="width:72px;"
+               oninput="formFormula.cpiMultiplier = parseFloat(this.value) || 0; updateFormulaSummary();">
+        <span>% of CPI</span>
+        <span style="color:var(--text-muted);">+</span>
+        <input type="number" step="0.1" value="${f.cpiAddition || 0}" class="rc-number-input" style="width:72px;"
+               oninput="formFormula.cpiAddition = parseFloat(this.value) || 0; updateFormulaSummary();">
+        <span>%</span>
+      </div>
+      ${cpiNote}`;
+  } else if (f.type === 'lesser_of' || f.type === 'greater_of') {
+    box.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="rc-sub-operand">
+          <div class="rc-sub-label">Operand 1</div>
+          ${buildOperandDom(0)}
+        </div>
+        <div class="rc-sub-operand">
+          <div class="rc-sub-label">Operand 2</div>
+          ${buildOperandDom(1)}
+        </div>
+      </div>
+      ${hasCpiComponent(f) ? cpiNote : ''}`;
+  }
+  updateFormulaSummary();
+}
+
+function buildOperandDom(index) {
+  const op = formFormula.operands[index];
+  return `
+    <select class="rc-select" onchange="onOperandTypeChange(${index}, this.value)">
+      <option value="flat_pct"    ${op.type === 'flat_pct'    ? 'selected' : ''}>Flat %</option>
+      <option value="flat_dollar" ${op.type === 'flat_dollar' ? 'selected' : ''}>Flat $</option>
+      <option value="cpi"         ${op.type === 'cpi'         ? 'selected' : ''}>CPI-based</option>
+    </select>
+    <div id="operandInputs-${index}" style="margin-top:8px;">${buildOperandInputsDom(index)}</div>`;
+}
+
+function buildOperandInputsDom(index) {
+  const op = formFormula.operands[index];
+  if (op.type === 'flat_pct') {
+    return `<div class="rc-op-row">
+      <input type="number" step="0.1" value="${op.value}" class="rc-number-input" style="width:78px;"
+             oninput="formFormula.operands[${index}].value = parseFloat(this.value) || 0; updateFormulaSummary();">
+      <span>%</span>
+    </div>`;
+  }
+  if (op.type === 'flat_dollar') {
+    return `<div class="rc-op-row">
+      <span>$</span>
+      <input type="number" value="${op.value}" class="rc-number-input" style="width:88px;"
+             oninput="formFormula.operands[${index}].value = parseFloat(this.value) || 0; updateFormulaSummary();">
+    </div>`;
+  }
+  return `<div class="rc-op-row">
+    <input type="number" value="${op.cpiMultiplier}" class="rc-number-input" style="width:64px;"
+           oninput="formFormula.operands[${index}].cpiMultiplier = parseFloat(this.value) || 0; updateFormulaSummary();">
+    <span>% of CPI</span>
+    <span style="color:var(--text-muted);">+</span>
+    <input type="number" step="0.1" value="${op.cpiAddition || 0}" class="rc-number-input" style="width:64px;"
+           oninput="formFormula.operands[${index}].cpiAddition = parseFloat(this.value) || 0; updateFormulaSummary();">
+    <span>%</span>
+  </div>`;
+}
+
+function onOperandTypeChange(index, newType) {
+  if (newType === 'flat_pct')    formFormula.operands[index] = { type:'flat_pct', value: 5 };
+  else if (newType === 'flat_dollar') formFormula.operands[index] = { type:'flat_dollar', value: 150 };
+  else                           formFormula.operands[index] = { type:'cpi', cpiMultiplier: 100, cpiAddition: 0 };
+  document.getElementById('operandInputs-' + index).innerHTML = buildOperandInputsDom(index);
+  updateFormulaSummary();
+}
+
+function updateFormulaSummary() {
+  const summary = formatFormula(formFormula) + (formCeiling != null ? `, capped at ${formCeiling}%` : '');
+  const showCurrent = hasCpiComponent(formFormula) || formCeiling != null;
+  const currentText = showCurrent
+    ? ` <span style="color:var(--text-muted);">— currently ${formatEffectiveCap(formFormula, formCeiling, CURRENT_CPI)}</span>`
+    : '';
+  document.getElementById('formulaSummary').innerHTML = summary + currentText;
+}
+
+// ── Vacancy + banking conditional fields ─────────────────
+function onVacancyChange(value) {
+  formVacancy = value;
+  document.getElementById('vacancyBonusFields').style.display = value === 'bonus' ? 'block' : 'none';
+  if (value !== 'bonus') { formVacancyBonus = null; formVacancyMax = null; }
+}
+function onBankingToggle(checked) {
+  formBanking = checked;
+  document.getElementById('bankingMultiplierField').style.display = checked ? 'block' : 'none';
+  if (!checked) formBankingMax = null;
+}
+
+// ── Modal open / close ───────────────────────────────────
+function openRuleModal(ruleId) {
+  editingRuleId = ruleId ?? null;
+  document.getElementById('ruleModalTitle').textContent = editingRuleId ? 'Edit Rule' : 'Add Rule';
+
+  if (editingRuleId) {
+    const r = RENT_CONTROL_RULES.find(x => x.id === editingRuleId);
+    document.getElementById('ruleName').value = r.name;
+    formScope = {
+      communityIds: r.scope.communityIds === 'all' ? 'all' : [...r.scope.communityIds],
+      bedTypes:     r.scope.bedTypes     === 'all' ? 'all' : [...r.scope.bedTypes],
+      unitIds:      r.scope.unitIds      === 'all' ? 'all' : [...r.scope.unitIds],
+    };
+    formFormula = JSON.parse(JSON.stringify(r.formula));
+    formCeiling = r.ceiling ?? null;
+    formFirstYear    = !!r.firstYearProtection;
+    formNoticeDays   = r.noticePeriodDays ?? 30;
+    formBuildingAge  = r.buildingAgeExemptionYears ?? null;
+    formVacancy      = r.vacancyDecontrol ?? 'none';
+    formVacancyBonus = r.vacancyBonusPct ?? null;
+    formVacancyMax   = r.vacancyMaxTotalPct ?? null;
+    formBanking      = !!r.bankingAllowed;
+    formBankingMax   = r.bankingMaxMultiplier ?? null;
+    document.getElementById('timeframe').value  = r.timeframe;
+    document.getElementById('activeFrom').value = r.activeFrom ? r.activeFrom.slice(0, 10) : '';
+    document.getElementById('activeTo').value   = r.activeTo   ? r.activeTo.slice(0, 10)   : '';
+    document.getElementById('ruleNotes').value  = r.notes ?? '';
+  } else {
+    document.getElementById('ruleName').value = '';
+    formScope   = { communityIds: 'all', bedTypes: 'all', unitIds: 'all' };
+    formFormula = { type: 'flat_pct', value: 5 };
+    formCeiling = null;
+    formFirstYear    = false;
+    formNoticeDays   = 30;
+    formBuildingAge  = null;
+    formVacancy      = 'none';
+    formVacancyBonus = null;
+    formVacancyMax   = null;
+    formBanking      = false;
+    formBankingMax   = null;
+    document.getElementById('timeframe').value  = '12mo';
+    const today = new Date();
+    document.getElementById('activeFrom').value =
+      today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    document.getElementById('activeTo').value = '';
+    document.getElementById('ruleNotes').value = '';
+  }
+
+  // Sync DOM state for the formula + tenant-protection sections
+  document.getElementById('calcType').value = formFormula.type;
+  document.getElementById('ceilingValue').value = formCeiling == null ? '' : String(formCeiling);
+  document.getElementById('firstYearProtection').checked = formFirstYear;
+  document.getElementById('noticeDays').value = String(formNoticeDays);
+  document.getElementById('buildingAge').value = formBuildingAge == null ? '' : String(formBuildingAge);
+  document.getElementById('vacancyDecontrol').value = formVacancy;
+  document.getElementById('vacancyBonusFields').style.display = formVacancy === 'bonus' ? 'block' : 'none';
+  document.getElementById('vacancyBonusPct').value = formVacancyBonus == null ? '' : String(formVacancyBonus);
+  document.getElementById('vacancyMaxTotalPct').value = formVacancyMax == null ? '' : String(formVacancyMax);
+  document.getElementById('bankingAllowed').checked = formBanking;
+  document.getElementById('bankingMultiplierField').style.display = formBanking ? 'block' : 'none';
+  document.getElementById('bankingMaxMultiplier').value = formBankingMax == null ? '' : String(formBankingMax);
+
+  buildFormulaInputs();
+  buildCommDropdown();
+  buildBedDropdown();
+  buildUnitDropdown();
+  updateScopeLabels();
+  document.getElementById('ruleModalBackdrop').classList.add('open');
+}
+
+function closeRuleModal() {
+  document.getElementById('ruleModalBackdrop').classList.remove('open');
+  editingRuleId = null;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeRuleModal();
+});
+
+// ── Save rule ────────────────────────────────────────────
+function saveRule() {
+  const name = document.getElementById('ruleName').value.trim();
+  if (!name) { alert('Rule name is required.'); return; }
+
+  const activeFromInput = document.getElementById('activeFrom').value;
+  if (!activeFromInput) { alert('Active from date is required.'); return; }
+  const activeFrom = new Date(activeFromInput + 'T00:00:00.000Z').toISOString();
+  const activeToInput = document.getElementById('activeTo').value;
+  const activeTo = activeToInput ? new Date(activeToInput + 'T00:00:00.000Z').toISOString() : null;
+
+  const scope = {
+    communityIds: formScope.communityIds === 'all' ? 'all' : [...formScope.communityIds],
+    bedTypes:     formScope.bedTypes     === 'all' ? 'all' : [...formScope.bedTypes],
+    unitIds:      formScope.unitIds      === 'all' ? 'all' : [...formScope.unitIds],
+  };
+
+  const payload = {
+    name,
+    scope,
+    formula: JSON.parse(JSON.stringify(formFormula)),
+    ceiling: formCeiling,
+    timeframe: document.getElementById('timeframe').value,
+    firstYearProtection: formFirstYear,
+    noticePeriodDays: formNoticeDays,
+    buildingAgeExemptionYears: formBuildingAge,
+    vacancyDecontrol: formVacancy,
+    vacancyBonusPct: formVacancy === 'bonus' ? formVacancyBonus : null,
+    vacancyMaxTotalPct: formVacancy === 'bonus' ? formVacancyMax : null,
+    bankingAllowed: formBanking,
+    bankingMaxMultiplier: formBanking ? formBankingMax : null,
+    activeFrom,
+    activeTo,
+    notes: document.getElementById('ruleNotes').value.trim(),
+  };
+
+  if (editingRuleId) {
+    const idx = RENT_CONTROL_RULES.findIndex(r => r.id === editingRuleId);
+    if (idx >= 0) RENT_CONTROL_RULES[idx] = { id: editingRuleId, ...payload };
+  } else {
+    const nextNum = RENT_CONTROL_RULES.reduce((m, r) => {
+      const n = parseInt(r.id.replace(/^RCR-/, ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0) + 1;
+    RENT_CONTROL_RULES.push({ id: 'RCR-' + String(nextNum).padStart(3, '0'), ...payload });
+  }
+  closeRuleModal();
+  renderRuleList();
+}
+
+// ── Delete rule ──────────────────────────────────────────
+function deleteRule(ruleId) {
+  const rule = RENT_CONTROL_RULES.find(r => r.id === ruleId);
+  if (!rule) return;
+  if (!confirm(`Delete rule '${rule.name}'? This cannot be undone.`)) return;
+  RENT_CONTROL_RULES = RENT_CONTROL_RULES.filter(r => r.id !== ruleId);
+  renderRuleList();
+}
+
+// ── Init ─────────────────────────────────────────────────
+populateFilters();
+rebuildUnitDropdown();
+renderRuleList();
+</script>
+</body>
+</html>

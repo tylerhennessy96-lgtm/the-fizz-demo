@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — Dynamica SmartGate</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body { height: 100%; overflow: auto; }
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% -10%, rgba(232,0,125,0.06), transparent 60%),
+        linear-gradient(180deg, #f8f9fb 0%, #f3f4f8 100%);
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px 16px;
+    }
+    .sso-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: 36px 36px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+    .sso-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .sso-brand img { height: 32px; width: auto; display: block; }
+    .sso-brand .wordmark {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      color: var(--text-primary);
+      text-transform: uppercase;
+    }
+    .sso-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+    }
+    .sso-headline {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+    .sso-subtext {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .sso-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background .12s, opacity .12s;
+    }
+    .sso-btn:hover { background: var(--accent-dim); }
+    .sso-btn:disabled { cursor: default; opacity: 0.85; }
+    .sso-btn-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: ssoSpin .7s linear infinite;
+      display: none;
+    }
+    .sso-btn.loading .sso-btn-spinner { display: inline-block; }
+    @keyframes ssoSpin { to { transform: rotate(360deg); } }
+
+    .sso-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 18px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .sso-divider::before,
+    .sso-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .sso-help {
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .sso-help:hover { color: var(--accent); text-decoration: underline; }
+
+    .sso-footer {
+      margin-top: 28px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sso-card">
+    <div class="sso-brand">
+      <img src="engine_logo (2).png" alt="Dynamica">
+      <span class="wordmark">DYNAMICA</span>
+    </div>
+    <div class="sso-sub">SmartGate</div>
+
+    <div class="sso-headline">Sign in to continue</div>
+    <div class="sso-subtext">Use your company SSO to access Dynamica SmartGate.</div>
+
+    <button class="sso-btn" id="ssoBtn" type="button">
+      <span class="sso-btn-spinner" aria-hidden="true"></span>
+      <span class="sso-btn-label">Sign in with SSO</span>
+    </button>
+
+    <div class="sso-divider" aria-hidden="true">or</div>
+
+    <a class="sso-help" href="#" onclick="event.preventDefault();">Having trouble? Contact your IT administrator</a>
+  </div>
+
+  <div class="sso-footer">© 2026 Dynamica. All rights reserved.</div>
+
+<script>
+  document.getElementById('ssoBtn').addEventListener('click', function () {
+    if (this.classList.contains('loading')) return;
+    this.classList.add('loading');
+    this.disabled = true;
+    this.querySelector('.sso-btn-label').textContent = 'Signing in…';
+    setTimeout(() => { window.location.href = 'index.html'; }, 800);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <script src="filters.js"></script>
+  <script src="date-picker.js"></script>
+  <style>
+    /* Unit lock — Notes column icon + rate freeze indicator */
+    .lock-btn {
+      background: none; border: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 2px; border-radius: 3px;
+      color: var(--text-muted);
+      transition: color .12s;
+    }
+    .lock-btn:hover { color: var(--accent); }
+    .lock-btn.locked { color: var(--accent); }
+    .lock-btn svg { width: 13px; height: 13px; }
+
+    .rate-locked {
+      background: rgba(148,163,184,0.10);
+      border-radius: 3px;
+      padding: 2px 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .rate-locked svg { color: var(--accent); flex-shrink: 0; }
+
+    .lock-date-trigger {
+      display: inline-flex; align-items: center; gap: 8px; max-width: 260px;
+      border: 1px solid var(--border-mid); border-radius: var(--radius);
+      padding: 7px 12px; font-family: 'Inter', sans-serif; font-size: 13px;
+      color: var(--text-primary); background: var(--surface); cursor: pointer;
+      transition: border-color .12s;
+    }
+    .lock-date-trigger:hover { border-color: var(--accent); }
+    .lock-date-trigger.is-placeholder { color: var(--text-muted); }
+    .lock-date-trigger svg { color: var(--text-muted); flex-shrink: 0; }
+
+    /* ── Recommendation chip (Increase / Decrease / No change) ── */
+    .rec-action-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10.5px; font-weight: 600; border-radius: 10px; padding: 2px 8px;
+      white-space: nowrap;
+    }
+    .rec-action-chip.ra-up   { background: #dcfce7; color: #166534; }
+    .rec-action-chip.ra-down { background: #fee2e2; color: #991b1b; }
+    .rec-action-chip.ra-flat { background: #f1f5f9; color: #64748b; }
+    .rec-state-tag {
+      display: inline-flex; align-items: center; font-size: 9px; font-weight: 700;
+      border-radius: 3px; padding: 1px 4px; margin-left: 4px; letter-spacing: .03em;
+    }
+    .rec-state-tag.t-accepted   { background: #dcfce7; color: #166534; }
+    .rec-state-tag.t-rejected   { background: #fee2e2; color: #991b1b; }
+    .rec-state-tag.t-overridden { background: #fef3c7; color: #92400e; }
+
+    /* ── Demand level badge ── */
+    .dl-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 9.5px; font-weight: 700; border-radius: 3px; padding: 1px 5px;
+      letter-spacing: .02em; cursor: help;
+    }
+    .dl-5 { background: rgba(22,163,74,0.18);  color: #14532d; }
+    .dl-4 { background: rgba(22,163,74,0.10);  color: #166534; }
+    .dl-3 { background: #f1f5f9;               color: #64748b; }
+    .dl-2 { background: rgba(37,99,235,0.10);  color: #1d4ed8; }
+    .dl-1 { background: rgba(37,99,235,0.18);  color: #1e3a8a; }
+
+    /* Pace cell colouring */
+    .pace-pos { color: #15803d; font-weight: 600; }
+    .pace-neg { color: #e05252; font-weight: 600; }
+    .pace-flat { color: var(--text-secondary); }
+
+    /* ── Booking curve modal (ported from demand-pace modal) ── */
+    .bc-backdrop {
+      position: fixed; inset: 0; background: rgba(15,17,22,0.55); z-index: 300;
+      display: none; align-items: center; justify-content: center; padding: 24px;
+    }
+    .bc-backdrop.is-open { display: flex; }
+    .bc-modal {
+      background: var(--surface); border-radius: 12px; width: min(96vw, 980px);
+      max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.28);
+      font-family: 'Inter', sans-serif;
+    }
+    .bc-header {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 18px 22px 14px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--surface); z-index: 5;
+    }
+    .bc-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .bc-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .bc-close {
+      margin-left: auto; background: none; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 4px; border-radius: 6px; display: inline-flex;
+    }
+    .bc-close:hover { color: var(--text-primary); background: #f3f4f8; }
+    .bc-body { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; padding: 16px 22px 22px; }
+    @media (max-width: 900px) { .bc-body { grid-template-columns: 1fr; } }
+    .bc-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .bc-panel {
+      border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+      background: var(--surface);
+    }
+    .bc-panel-title {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px;
+    }
+    .bc-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; flex-wrap: wrap; }
+    .bc-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+    .bc-legend-tick { display: inline-block; width: 12px; height: 0; border-top: 2px solid #2563eb; margin-right: 5px; vertical-align: 3px; }
+    .bc-chart-area { position: relative; width: 100%; }
+    .bc-chart-area svg { width: 100%; height: auto; display: block; }
+    .chart-tooltip {
+      position: absolute; display: none; pointer-events: none; z-index: 10;
+      background: #1a1d23; border: 1px solid #2a2d35; border-radius: 7px;
+      padding: 8px 10px; font-size: 11px; color: #d1d5db; min-width: 130px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .chart-tooltip-header { font-weight: 600; color: #e5e7eb; margin-bottom: 4px; font-size: 11px; }
+    .chart-tooltip-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+    .chart-tooltip-row .swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .chart-tooltip-row .label { color: #9ca3af; }
+    .chart-tooltip-row .value { margin-left: auto; font-weight: 600; color: #e5e7eb; }
+    .chart-tooltip-row.emphasized .label { color: #e5e7eb; }
+    .bc-compare { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .bc-compare th, .bc-compare td { padding: 6px 8px; text-align: right; }
+    .bc-compare th { font-size: 10.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+    .bc-compare td:first-child, .bc-compare th:first-child { text-align: left; color: var(--text-secondary); }
+    .bc-compare td { border-bottom: 1px solid var(--border); color: var(--text-primary); font-weight: 500; }
+    .bc-compare tr:last-child td { border-bottom: none; }
+    .bc-rec-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+    .bc-rec-row .label { color: var(--text-secondary); }
+    .bc-rec-row .value { font-weight: 700; color: var(--text-primary); }
+    .bc-rec-row .value.pct.cell-pos { color: #15803d; }
+    .bc-rec-row .value.pct.cell-neg { color: #e05252; }
+    .bc-override-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
+    .bc-override-row label { font-size: 12px; color: var(--text-secondary); }
+    .bc-override-input {
+      flex: 1; border: 1px solid var(--border-mid); border-radius: var(--radius);
+      padding: 7px 10px; font-family: 'Inter', sans-serif; font-size: 13px;
+      color: var(--text-primary); background: var(--surface); outline: none;
+    }
+    .bc-override-input:focus { border-color: var(--accent); }
+    .bc-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .bc-btn {
+      flex: 1; border-radius: var(--radius); padding: 8px 0; font-family: 'Inter', sans-serif;
+      font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .12s;
+    }
+    .bc-btn-accept { border: 1px solid #16a34a; background: #fff; color: #166534; }
+    .bc-btn-accept:hover, .bc-btn-accept.solid { background: #16a34a; color: #fff; }
+    .bc-btn-reject { border: 1px solid #e05252; background: #fff; color: #991b1b; }
+    .bc-btn-reject:hover, .bc-btn-reject.solid { background: #e05252; color: #fff; }
+    .bc-dl-big { display: flex; align-items: center; gap: 12px; }
+    .bc-dl-code { font-size: 22px; font-weight: 800; }
+    .bc-dl-text { font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
+    .bc-alert-list { display: flex; flex-direction: column; gap: 6px; }
+    .bc-alert-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+    
+
+    /* ── Stay type link in table ── */
+    .stay-link {
+      color: var(--accent); text-decoration: underline; cursor: pointer;
+      white-space: nowrap; font-size: 12px;
+    }
+
+    /* Highlighted stay column in stay modal table */
+    .stay-col-default { background: rgba(232,0,125,0.05); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+
+    <div class="nav-tabs">
+      <a href="pricing.html"      class="nav-tab active">Pricing</a>
+      <a href="stay-types.html"   class="nav-tab">Stay Types</a>
+      <a href="rent-control.html" class="nav-tab">Rent Control</a>
+      <a href="autopilot.html"    class="nav-tab">Autopilot</a>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+          Parameters
+        </a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>
+          Log out
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Filter Bar ── -->
+  <div class="filter-bar" id="filterBar">
+  </div>
+
+  <!-- ── Sub-tab Bar ── -->
+  <div class="subtab-bar">
+    <span style="font-size:11.5px;color:var(--text-muted);">Booking season 2026/27 &middot; Full Year Stay rates &middot; Sep 1 move-in</span>
+    <div class="subtab-spacer"></div>
+    <span class="rerun-timestamp" id="rerunTimestamp">Last updated: 8:00 AM today</span>
+    <button class="btn-adv-filters btn-rerun" id="rerunBtn" onclick="rerunPricing()" style="margin-right:12px;">
+      <span id="rerunBtnIcon" style="display:inline-flex;align-items:center;">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v3h-3"/><path d="M12 6a5 5 0 1 0-1.5 3.5"/></svg>
+      </span>
+      <span id="rerunBtnLabel">Re-run pricing</span>
+    </button>
+    <button class="btn-adv-filters" onclick="toggleAdvDrawer()">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="2" y1="4" x2="12" y2="4"/><line x1="4" y1="7" x2="10" y2="7"/><line x1="6" y1="10" x2="8" y2="10"/>
+      </svg>
+      Advanced filters
+    </button>
+    <button class="btn-save" id="saveBtn" onclick="saveChanges()" style="display:none;margin-left:8px;">Save changes</button>
+  </div>
+
+  <!-- ── Status Legend ── -->
+  <div class="status-legend">
+    <span class="status-legend-group">Unit Status:</span>
+    <span class="status-legend-item"><span style="background:#f87171;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">VC</span>Vacant</span>
+    <span class="status-legend-item"><span style="background:#94a3b8;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">ON</span>On Notice</span>
+    <span class="status-legend-item"><span style="background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">RC</span>Rent Control</span>
+  </div>
+
+  <!-- ── Stats Bar ── -->
+  <div id="pricingStatsBar" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:6px;align-items:center;flex-wrap:nowrap;overflow-x:auto;"></div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="table-wrap" id="tableWrap">
+      <table class="data-table" id="pricingTable">
+        <thead>
+          <tr>
+            <th style="min-width:190px;">House <span class="th-sub">Available/total beds</span></th>
+            <th>Avail. <span class="th-sub">%</span></th>
+            <th style="width:42px;text-align:center;">RC</th>
+            <th>Status</th>
+            <th style="width:66px;">Alerts</th>
+            <th>Bookings <span class="th-sub">sold / fcst</span></th>
+            <th>Pace <span class="th-sub">vs last yr</span></th>
+            <th style="width:56px;">Demand</th>
+            <th>Stay <span class="th-sub">Type</span></th>
+            <th style="text-align:right;">Current<br><span class="th-sub">Rate</span></th>
+            <th style="text-align:right;">Rec.<br><span class="th-sub">Rate</span></th>
+            <th>Recommendation</th>
+            <th class="price-change-abs" style="width:80px;min-width:80px;padding-left:8px;padding-right:4px;">Price Change <span class="th-sub">(abs.)</span></th>
+            <th class="price-change-pct" style="width:72px;min-width:72px;padding-left:4px;padding-right:8px;">Price Change <span class="th-sub">(%)</span></th>
+            <th style="width:60px;">Notes</th>
+            <th style="width:32px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Panels Container -->
+    <div class="panels-container" id="panelsContainer">
+
+      <!-- Unit Rate History Panel -->
+      <div class="unit-pricing-wrap" id="unitPricingWrap" style="display:none;">
+        <div class="panel-collapse-handle" onclick="toggleUnitPricing()">
+          <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,5 7,9 11,5"/></svg>
+        </div>
+        <div class="unit-pricing-panel" id="unitPricingPanel">
+          <div class="panel-header-bar">
+            <span style="font-size:14px;font-weight:600;color:#fff;">Unit Rate History</span>
+            <span style="color:#3d4150;margin:0 10px;">|</span>
+            <span style="font-size:13px;color:#9ca3af;" id="unitPricingUnitId"></span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+              <span class="legend-item"><span class="legend-line" style="background:#e8007d"></span>Listed Rate</span>
+              <span class="legend-item"><span class="legend-line" style="background:#60a5fa;border-top:2px dashed #60a5fa;height:0;"></span>Avg Booked Rate</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span>Override</span>
+              <button onclick="toggleUnitPricing()" title="Close panel" style="background:none;border:none;cursor:pointer;color:#6b7280;display:flex;align-items:center;padding:4px 8px;border-radius:4px;margin-left:8px;" onmouseover="this.style.color='#e5e7eb'" onmouseout="this.style.color='#6b7280'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg></button>
+            </div>
+          </div>
+          <div style="padding:12px 20px;flex:1;overflow:hidden;">
+            <div style="position:relative;width:100%;height:100%;">
+              <canvas id="unitPricingChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Occupancy Panel -->
+      <div class="exposure-wrap" id="exposureWrap" style="display:none;">
+        <div class="panel-collapse-handle" onclick="toggleExposure()">
+          <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,5 7,9 11,5"/></svg>
+        </div>
+        <div class="exposure-panel" id="exposurePanel">
+          <div class="panel-header-bar" style="display:flex;align-items:center;height:44px;padding:0 16px;border-bottom:1px solid var(--nav-border);flex-shrink:0;gap:12px;">
+            <span class="exposure-title">Occupancy &amp; Rate</span>
+            <span style="color:#3d4150;">|</span>
+            <span class="exposure-prop" id="exposurePropName" style="font-size:13px;color:#9ca3af;">Select a house</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+              <button onclick="toggleExposure()" title="Close panel" style="background:none;border:none;cursor:pointer;color:#6b7280;display:flex;align-items:center;padding:4px;border-radius:4px;" onmouseover="this.style.color='#e5e7eb'" onmouseout="this.style.color='#6b7280'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg></button>
+            </div>
+          </div>
+          <div class="exposure-inner">
+            <div class="exposure-charts">
+              <div class="chart-box">
+                <div class="chart-label">
+                  Available beds <span style="font-size:10px;color:#6b7280;">in %</span>
+                  <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-dot" style="background:#f5a623"></span>Unsold</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#60a5fa"></span>30 Day</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#a78bfa"></span>60 Day</span>
+                  </div>
+                </div>
+                <div class="chart-canvas-wrap" id="exposureChartWrap">
+                  <canvas id="exposureChart"></canvas>
+                </div>
+              </div>
+              <div class="chart-box">
+                <div class="chart-label">
+                  Rates <span style="font-size:10px;color:#6b7280;">in &euro;</span>
+                  <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-line" style="background:#475569;border-top:1px dashed #475569;height:0;"></span>Comp Floor</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#475569;border-top:1px dashed #475569;height:0;"></span>Comp Ceiling</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#f472b6"></span>Competitor Median</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#e8007d"></span>FIZZ Median</span>
+                  </div>
+                </div>
+                <div class="chart-canvas-wrap" id="compChartWrap">
+                  <canvas id="compChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Advanced Filters Drawer -->
+    <div class="adv-drawer" id="advDrawer">
+      <div class="adv-drawer-header">
+        <span class="adv-drawer-title">Advanced filters</span>
+        <button class="adv-close" onclick="toggleAdvDrawer()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+        </button>
+      </div>
+
+      <div class="adv-drawer-body">
+      <div class="adv-section">
+        <div class="adv-section-title">Unit ID</div>
+        <input type="text" id="unitIdSearch" placeholder="Search or paste unit ID..." oninput="renderTable()" style="width:100%;border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 10px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text-primary);background:var(--surface);outline:none;">
+      </div>
+
+      <div class="adv-section">
+        <div class="adv-section-title">Room type</div>
+        <select class="adv-full-select" id="roomTypeFilter" onchange="renderTable()">
+          <option value="">All Room Types</option>
+          <option>Single Studio</option>
+          <option>Double Studio</option>
+        </select>
+      </div>
+
+      <div class="adv-section">
+        <div class="adv-section-title">Unit Status</div>
+        <div style="display:flex;gap:12px;">
+          <label class="ms-option" style="display:inline-flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="statusVacant" onchange="renderTable()">
+            <span>Vacant</span>
+          </label>
+          <label class="ms-option" style="display:inline-flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="statusOnNotice" onchange="renderTable()">
+            <span>On Notice</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="adv-section">
+        <div class="adv-section-title">Alerts</div>
+        <select class="adv-full-select" id="alertFilter" onchange="renderTable()">
+          <option value="">All alerts</option>
+          <option value="lowPace">Low pace</option>
+          <option value="highDemand">High demand</option>
+          <option value="lowDemand">Low demand</option>
+        </select>
+      </div>
+
+      <div class="adv-section">
+        <div class="adv-section-title">Recommendation</div>
+        <select class="adv-full-select" id="recFilter" onchange="renderTable()">
+          <option value="">All</option>
+          <option>Increase</option>
+          <option>Decrease</option>
+          <option>No change</option>
+        </select>
+      </div>
+      </div>
+
+      <div class="adv-footer">
+        <button class="btn-apply" onclick="renderTable();toggleAdvDrawer()">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stay Type Pricing Modal ── -->
+<div class="modal-backdrop" id="stayModal">
+  <div class="modal" style="width:min(95vw,1000px);max-width:min(95vw,1000px);max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+      <div>
+        <div class="modal-title">Stay type pricing</div>
+        <div class="modal-subtitle" id="stayModalUnit"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:11.5px;color:var(--text-muted);" id="stayModalMoveIn"></span>
+        <button class="modal-close" onclick="closeModal('stayModal')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;overflow-y:auto;">
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <div style="position:relative;height:280px;padding:10px 14px 0;">
+          <canvas id="stayChart"></canvas>
+        </div>
+        <table id="stayTable" style="width:100%;border-collapse:collapse;font-size:12.5px;border-top:1px solid var(--border);"></table>
+      </div>
+      <div style="margin-top:12px;font-size:11.5px;color:var(--text-muted);line-height:1.5;">
+        Plug&amp;Play stays include the fully serviced all-in package (linens, kitchen box, cleaning). October move-in carries the hold-time premium — the room is held empty through September.
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="closeModal('stayModal')">Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Booking Curve Modal ── -->
+<div class="bc-backdrop" id="bcBackdrop" aria-hidden="true"></div>
+
+<!-- ── House Attributes Modal ── -->
+<div class="modal-backdrop" id="commAttrModal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">House Attributes</div>
+        <div class="modal-subtitle" id="commAttrName"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('commAttrModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="commAttrFacts" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Community Spaces &amp; Services</div>
+      <div id="commAttrAmenities" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('commAttrModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts tooltip -->
+<div class="tooltip-popup" id="alertsTooltip">
+  <div class="tooltip-title">Alerts in effect</div>
+  <div id="alertsTooltipBody"></div>
+</div>
+
+<!-- Calendar popup -->
+<div id="calendarModal" class="calendar-popup">
+  <div class="calendar-header">
+    <button class="calendar-nav" id="calPrev" onclick="calNav(-1)">
+      <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="7,1 3,5 7,9"/></svg>
+    </button>
+    <span class="calendar-month" id="calMonthLabel"></span>
+    <button class="calendar-nav" id="calNext" onclick="calNav(1)">
+      <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3,1 7,5 3,9"/></svg>
+    </button>
+  </div>
+  <div class="calendar-weekdays">
+    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+  </div>
+  <div class="calendar-days" id="calDays"></div>
+</div>
+
+<!-- ── Note Modal ── -->
+<div class="modal-backdrop" id="noteModal">
+  <div class="modal" style="width:440px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Notes</div>
+        <div class="modal-subtitle" id="noteModalUnit"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('noteModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px;">
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Note</label>
+        <textarea id="noteTextarea" rows="4" class="note-textarea" placeholder="Add a note..."></textarea>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Expires</label>
+        <button class="date-picker-btn" id="noteExpiryBtn" onclick="openCalendar('noteExpiry', this)" style="background:var(--surface);border:1px solid var(--border-mid);color:var(--text-primary);">
+          <span id="noteExpiryLabel">Select date</span>
+          <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="#6b7280" stroke-width="1.5"><rect x="1" y="2" width="12" height="11" rx="1.5"/><line x1="1" y1="6" x2="13" y2="6"/><line x1="4" y1="1" x2="4" y2="3"/><line x1="10" y1="1" x2="10" y2="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('noteModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNote()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lock Unit Pricing Modal ── -->
+<div class="modal-backdrop" id="lockModal">
+  <div class="modal" style="width:min(95vw,520px);">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="lockModalTitle">Lock Unit Rate</div>
+        <div class="modal-subtitle" id="lockModalUnit"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('lockModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="padding:18px 20px;">
+      <div style="margin-bottom:18px;">
+        <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;">Lock until</div>
+        <div style="display:flex;border:1px solid var(--border-mid);border-radius:var(--radius);overflow:hidden;max-width:360px;">
+          <button type="button" id="lockMode_indef" onclick="_setLockMode('indef')" style="flex:1;padding:8px 14px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;background:var(--surface);color:var(--text-secondary);">Indefinite</button>
+          <button type="button" id="lockMode_date"  onclick="_setLockMode('date')"  style="flex:1;padding:8px 14px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;background:var(--surface);color:var(--text-secondary);">Until date</button>
+        </div>
+        <div id="lockDateRow" style="display:none;margin-top:10px;">
+          <button type="button" id="lockDateTrigger" class="lock-date-trigger is-placeholder">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="11" height="10" rx="1"/><line x1="1.5" y1="5.5" x2="12.5" y2="5.5"/><line x1="4.5" y1="1" x2="4.5" y2="4"/><line x1="9.5" y1="1" x2="9.5" y2="4"/></svg>
+            <span id="lockDateLabel">Select date</span>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px;">Reason / notes <span style="font-weight:400;text-transform:none;color:var(--text-muted);">(optional)</span></div>
+        <input type="text" id="lockReason" maxlength="120" placeholder="e.g. University nomination block, refurbishment" style="width:100%;border:1px solid var(--border-mid);border-radius:var(--radius);padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text-primary);background:var(--surface);outline:none;">
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;align-items:center;gap:8px;">
+      <button type="button" id="lockRemoveBtn" onclick="removeLockFromModal()" class="btn btn-ghost" style="display:none;color:#e05252;border:1px solid rgba(248,113,113,0.35);">Remove Lock</button>
+      <div style="flex:1;"></div>
+      <button type="button" onclick="closeModal('lockModal')" class="btn btn-ghost">Cancel</button>
+      <button type="button" onclick="saveLockFromModal()" class="btn btn-primary">Save Lock</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let expandedHouses = new Set();
+let expandedRoomTypes = {};
+let exposureOpen = false;
+let exposurePropId = null;
+let advDrawerOpen = false;
+let exposureChartInst = null;
+let compChartInst = null;
+let unitPricingChartInst = null;
+let unitPricingOpen = false;
+const currentMoveIn = DEFAULT_MOVE_IN;   // pricing table shows Sep 1 rates
+const alertCfg = ALERT_DEFAULTS;
+
+// Recommendation decisions from the booking curve modal
+// unitId → { state: 'accepted'|'rejected'|'overridden', overrideValue }
+const recStates = {};
+
+function findUnit(unitId) {
+  const found = findUnitInPricingData(unitId);
+  return found ? found.unit : null;
+}
+
+// ── Currency + move-in scaling ────────────────────────────
+function fmt(n) { return n != null ? '\u20ac' + Math.round(n).toLocaleString('en-GB') : ''; }
+function fmtPct(n) { return n != null ? (n > 0 ? '+' : '') + n + '%' : ''; }
+
+// Every displayed rate is the Full Year Stay rate scaled by the selected
+// move-in date's hold-time premium.
+function scaleMoveIn(v) {
+  const mi = moveInById(currentMoveIn);
+  return Math.round(v * (1 + mi.premiumPct / 100));
+}
+
+// ── Price Override System ────────────────────────────────
+const priceOverrides = {};
+
+function computeRec(originalRec, overrideKey) {
+  const o = priceOverrides[overrideKey];
+  if (!o) return originalRec;
+  let v = originalRec;
+  if (o.absChange != null) v = v + o.absChange;
+  if (o.pctChange != null) v = v * (1 + o.pctChange / 100);
+  return Math.round(v);
+}
+
+// The rec shown for a unit, in Full-Year/Sep-1 reference terms:
+// lock beats modal-override beats table-override beats engine rec.
+function effectiveRec(unit) {
+  if (unit.lock && unit.lock.locked) return unit.lock.lockedRate ?? unit.rec;
+  const rs = recStates[unit.id];
+  if (rs && rs.state === 'overridden' && typeof rs.overrideValue === 'number') return rs.overrideValue;
+  return computeRec(unit.rec, unit.id);
+}
+
+function recActionFor(unit) {
+  const rs = recStates[unit.id];
+  if (rs && rs.state === 'rejected') return 'No change';
+  const shown = effectiveRec(unit);
+  if (shown > unit.rate) return 'Increase';
+  if (shown < unit.rate) return 'Decrease';
+  return 'No change';
+}
+
+function recActionChip(action, stateTag) {
+  const cls  = action === 'Increase' ? 'ra-up' : action === 'Decrease' ? 'ra-down' : 'ra-flat';
+  const icon = action === 'Increase' ? '\u2191' : action === 'Decrease' ? '\u2193' : '\u2014';
+  return '<span class="rec-action-chip ' + cls + '">' + icon + '&nbsp;' + action + '</span>' + (stateTag || '');
+}
+
+function recStateTag(unitId) {
+  const rs = recStates[unitId];
+  if (!rs || !rs.state) return '';
+  const map = {
+    accepted:   ['t-accepted', 'ACC'],
+    rejected:   ['t-rejected', 'REJ'],
+    overridden: ['t-overridden', 'OVR'],
+  };
+  const m = map[rs.state];
+  return m ? '<span class="rec-state-tag ' + m[0] + '">' + m[1] + '</span>' : '';
+}
+
+function onPriceChange(rowKey, type, rawValue, rowLevel, parentKeys) {
+  const num = parseFloat(rawValue.replace(/[^0-9.\-]/g, ''));
+  if (isNaN(num)) {
+    if (priceOverrides[rowKey]) {
+      priceOverrides[rowKey][type === 'abs' ? 'absChange' : 'pctChange'] = null;
+    }
+  } else {
+    if (!priceOverrides[rowKey]) priceOverrides[rowKey] = { absChange: null, pctChange: null };
+    if (type === 'abs') {
+      priceOverrides[rowKey].absChange = num;
+      priceOverrides[rowKey].pctChange = null;
+    } else {
+      priceOverrides[rowKey].pctChange = num;
+      priceOverrides[rowKey].absChange = null;
+    }
+    if (rowLevel === 'roomtype' || rowLevel === 'house') {
+      cascadeOverride(rowKey, rowLevel, num, type, parentKeys);
+    }
+  }
+  renderTableInPlace();
+  checkSaveVisibility();
+}
+
+function checkSaveVisibility() {
+  const hasChanges = Object.values(priceOverrides).some(o => o.absChange != null || o.pctChange != null);
+  const btn = document.getElementById('saveBtn');
+  if (btn) btn.style.display = hasChanges ? 'inline-flex' : 'none';
+}
+
+function saveChanges() {
+  const changedCount = Object.keys(priceOverrides).filter(k => priceOverrides[k].absChange != null || priceOverrides[k].pctChange != null).length;
+  Object.keys(priceOverrides).forEach(k => delete priceOverrides[k]);
+  document.getElementById('saveBtn').style.display = 'none';
+  renderTable();
+  showToast(changedCount + ' rate change' + (changedCount !== 1 ? 's' : '') + ' saved successfully');
+}
+
+function showToast(message) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'toast';
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;opacity:0;transition:opacity .2s;display:flex;align-items:center;gap:8px;';
+  el.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="2,7 5.5,10.5 12,3"/></svg>' + message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, 2500);
+}
+
+function cascadeOverride(sourceKey, level, num, type, parentKeys) {
+  for (const house of PRICING_DATA) {
+    if (level === 'house' && house.id === sourceKey) {
+      for (const rt of house.roomTypes) {
+        const rtKey = house.id + rt.type;
+        priceOverrides[rtKey] = { absChange: type==='abs'?num:null, pctChange: type==='pct'?num:null, inherited: true };
+        for (const u of rt.units) {
+          priceOverrides[u.id] = { absChange: type==='abs'?num:null, pctChange: type==='pct'?num:null, inherited: true };
+        }
+      }
+    }
+    if (level === 'roomtype') {
+      for (const rt of house.roomTypes) {
+        if (house.id + rt.type === sourceKey) {
+          for (const u of rt.units) {
+            priceOverrides[u.id] = { absChange: type==='abs'?num:null, pctChange: type==='pct'?num:null, inherited: true };
+          }
+        }
+      }
+    }
+  }
+}
+
+function renderTableInPlace() {
+  const wrap = document.getElementById('tableWrap');
+  const scrollTop = wrap.scrollTop;
+  renderTable();
+  wrap.scrollTop = scrollTop;
+}
+
+// ── Nav menu ──────────────────────────────────────────────
+function toggleMenu() {
+  document.getElementById('navDropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.nav-menu-btn') && !e.target.closest('.nav-dropdown')) {
+    document.getElementById('navDropdown').classList.remove('open');
+  }
+});
+
+// ── Filters (shared pill component) ───────────────────────
+let pillFilters = null;
+function getMsValues(id) { return pillFilters ? pillFilters.values(id) : []; }
+
+function populateFilters() {
+  pillFilters = createPillFilters({
+    container: document.getElementById('filterBar'),
+    filters: [
+      { id: 'country', label: 'Countries',        items: [...new Set(HOUSES.map(c => c.country))] },
+      { id: 'city',    label: 'Cities',           items: [...new Set(HOUSES.map(c => c.city))] },
+      { id: 'house',   label: 'Houses',           items: HOUSES.map(c => c.name) },
+      { id: 'rm',      label: 'Revenue Managers', items: [...new Set(HOUSES.map(c => c.rm))] },
+      { id: 'hm',      label: 'House Managers',   items: [...new Set(HOUSES.map(c => c.hm))] },
+    ],
+    storageKey: 'fizz_filters',
+    onChange: renderTable,
+  });
+}
+
+// ── Input Formatting ──────────────────────────────────────
+function handleAbsInput(input, rowKey, rowLevel, parentKeys) {
+  let raw = input.value.replace(/[^0-9.\-]/g, '');
+  onPriceChange(rowKey, 'abs', raw, rowLevel, parentKeys);
+}
+function handlePctInput(input, rowKey, rowLevel, parentKeys) {
+  let raw = input.value.replace(/[^0-9.\-]/g, '');
+  onPriceChange(rowKey, 'pct', raw, rowLevel, parentKeys);
+}
+function applyEuroFormat(input) {
+  const val = parseFloat(input.value.replace(/[^0-9.\-]/g, ''));
+  input.value = isNaN(val) ? '' : '\u20ac' + val;
+}
+function applyPctFormat(input) {
+  const val = parseFloat(input.value.replace(/[^0-9.\-]/g, ''));
+  input.value = isNaN(val) ? '' : val + '%';
+}
+
+// ── Stats Bar ─────────────────────────────────────────────
+function renderStatsBar(filteredData) {
+  const allRts = filteredData.flatMap(c => c.roomTypes);
+  const allUnits = filteredData.flatMap(c => c.roomTypes.flatMap(rt => rt.units));
+  const totalSold = allRts.reduce((s,rt) => s + rt.sold, 0);
+  const totalFcst = allRts.reduce((s,rt) => s + rt.fcst, 0);
+  const pctOfFcst = totalFcst > 0 ? Math.round(totalSold / totalFcst * 100) : 0;
+
+  const revW = allRts.reduce((s,rt) => s + rt.sold * rt.rate, 0);
+  const avgPace = revW > 0 ? Math.round(allRts.reduce((s,rt) => s + rt.ros * rt.sold * rt.rate, 0) / revW) : 0;
+
+  const avgOcc = allRts.length > 0 ? Math.round(allRts.reduce((s,rt) => s + rt.projOcc, 0) / allRts.length) : 0;
+  const lowPaceCount = allRts.filter(rt => rt.ros < alertCfg.lowPace.threshold).length;
+
+  const avgRate = allUnits.length > 0 ? scaleMoveIn(allUnits.reduce((s,u) => s + u.rate, 0) / allUnits.length) : 0;
+
+  const overrideCount = Object.keys(priceOverrides).filter(k =>
+    priceOverrides[k].absChange != null || priceOverrides[k].pctChange != null
+  ).length;
+
+  const stats = [
+    { label: 'Beds Sold', value: totalSold.toLocaleString('en-GB') + ' / ' + totalFcst.toLocaleString('en-GB'), color: 'var(--text-primary)' },
+    { label: '% of Forecast', value: pctOfFcst + '%', color: 'var(--text-primary)' },
+    { label: 'Pace vs LY', value: (avgPace > 0 ? '+' : '') + avgPace + '%', color: avgPace >= 0 ? '#15803d' : '#e05252' },
+    { label: 'Proj. Occupancy', value: avgOcc + '%', color: avgOcc > 95 ? '#15803d' : 'var(--text-primary)' },
+    { label: 'Low Pace', value: lowPaceCount + ' room type' + (lowPaceCount === 1 ? '' : 's'), color: lowPaceCount > 0 ? '#ea580c' : 'var(--text-muted)' },
+    { label: 'Avg Rate', value: fmt(avgRate), color: 'var(--text-primary)' },
+    { label: 'Rate Overrides', value: overrideCount, color: overrideCount > 0 ? 'var(--accent)' : 'var(--text-muted)' },
+  ];
+
+  const el = document.getElementById('pricingStatsBar');
+  if (!el) return;
+  el.innerHTML = stats.map((s, i) => `
+    ${i > 0 ? '<div style="width:1px;height:24px;background:var(--border);flex-shrink:0;"></div>' : ''}
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 12px;flex-shrink:0;">
+      <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;margin-bottom:1px;">${s.label}</div>
+      <div style="font-size:13px;font-weight:700;color:${s.color};white-space:nowrap;">${s.value}</div>
+    </div>
+  `).join('');
+}
+
+// ── Alerts cell ───────────────────────────────────────────
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+// ── Alerts — REIT-style bell + tooltip ────────────────────
+const alertConfig = {
+  lowPace:    { label: 'Low pace',    icon: '<polyline points="2,4 5,7 8,5.5 12,10"/><polyline points="9,10 12,10 12,7"/>' },
+  highDemand: { label: 'High demand', icon: '<polyline points="2,10 5,7 8,8.5 12,4"/><polyline points="9,4 12,4 12,7"/>' },
+  lowDemand:  { label: 'Low demand',  icon: '<polyline points="2,4 6,8 8,6.5 12,10"/><circle cx="12" cy="10" r=".8" fill="currentColor"/>' },
+};
+
+function alertsCellHtml(alerts) {
+  if (!alerts || alerts.length === 0) return '';
+  const alertsJson = JSON.stringify(alerts.map(a => ({ type: a.type, tooltip: a.tooltip }))).replace(/"/g, '&quot;');
+  const badge = alerts.length > 1 ? `<span style="position:absolute;top:-4px;right:-6px;background:#f5a623;color:#fff;font-size:8px;font-weight:700;border-radius:8px;min-width:14px;height:14px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;">${alerts.length}</span>` : '';
+  return `<div style="position:relative;display:inline-flex;"><button class="alert-bell" title="Alerts" onclick="showAlerts(event, ${alertsJson})" style="background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#f5a623" stroke-width="1.5" stroke-linecap="round"><path d="M8 2a5 5 0 0 1 5 5c0 3.5 1.5 4.5 1.5 4.5h-13S3 10.5 3 7a5 5 0 0 1 5-5z"/><line x1="6.5" y1="14" x2="9.5" y2="14"/></svg>
+  </button>${badge}</div>`;
+}
+
+function showAlerts(e, alerts) {
+  e.stopPropagation();
+  if (!alerts || alerts.length === 0) return;
+  const tt = document.getElementById('alertsTooltip');
+  const body = document.getElementById('alertsTooltipBody');
+  body.innerHTML = alerts.map(a => {
+    const cfg = alertConfig[a.type];
+    if (!cfg) return '';
+    return `<div class="tooltip-item" title="${esc(a.tooltip)}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">${cfg.icon}</svg> ${esc(a.tooltip)}</div>`;
+  }).join('');
+  tt.style.left = (e.clientX - 10) + 'px';
+  tt.style.top = (e.clientY + 16) + 'px';
+  tt.classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.alert-bell')) {
+    document.getElementById('alertsTooltip').classList.remove('open');
+  }
+});
+
+function dlBadge(demand) {
+  const dl = demandLevelForScore(demand);
+  const text = DEMAND_SHORT[dl.level] || dl.label;
+  return '<span class="dl-badge dl-' + dl.level + '" title="' + esc(dl.label + ' \u2014 ' + dl.interp) + '">' + text + '</span>';
+}
+
+function paceCell(ros) {
+  const cls = ros > 3 ? 'pace-pos' : ros < -3 ? 'pace-neg' : 'pace-flat';
+  return '<span class="' + cls + '">' + (ros > 0 ? '+' : '') + ros + '%</span>';
+}
+
+function noteCell(id, note) {
+  if (!note) {
+    return `<button class="add-concs-btn" onclick="openNoteModal('${id}', null)"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><line x1="7" y1="5" x2="7" y2="9"/><line x1="5" y1="7" x2="9" y2="7"/></svg>Add</button>`;
+  }
+  const noteJson = JSON.stringify(note).replace(/"/g, '&quot;');
+  return `<button title="${esc(note.text)}" onclick="openNoteModal('${id}', ${noteJson})" style="background:none;border:none;cursor:pointer;color:var(--accent);display:inline-flex;align-items:center;padding:0;">
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><line x1="4.5" y1="4.5" x2="9.5" y2="4.5"/><line x1="4.5" y1="7" x2="9.5" y2="7"/><line x1="4.5" y1="9.5" x2="7" y2="9.5"/></svg>
+  </button>`;
+}
+
+function unitNotesCell(unit) {
+  const isLocked = !!(unit.lock && unit.lock.locked);
+  let title;
+  if (isLocked) {
+    if (unit.lock.lockUntil) {
+      const d = new Date(unit.lock.lockUntil);
+      title = 'Locked until ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    } else {
+      title = 'Locked indefinitely';
+    }
+  } else {
+    title = 'Lock unit rate';
+  }
+  const iconPath = isLocked
+    ? `<svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><rect x="3" y="6.5" width="8" height="6" rx="1"/><path d="M4.5 6.5V4.5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke-linecap="round"/></svg>`
+    : `<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="6.5" width="8" height="6" rx="1"/><path d="M4.5 6.5V4.5a2.5 2.5 0 0 1 5 0v2"/></svg>`;
+  const lockBtn = `<button class="lock-btn${isLocked?' locked':''}" title="${esc(title)}" onclick="openLockModal('${unit.id}')">${iconPath}</button>`;
+  return `<span style="display:inline-flex;align-items:center;gap:6px;">${noteCell(unit.id, unit.note)}${lockBtn}</span>`;
+}
+
+// ── Table Rendering ───────────────────────────────────────
+function renderTable() {
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = '';
+
+  const countryF = getMsValues('country');
+  const cityF = getMsValues('city');
+  const houseF = getMsValues('house');
+  const rmF = getMsValues('rm');
+  const hmF = getMsValues('hm');
+  const unitIdQuery = document.getElementById('unitIdSearch')?.value.trim().toLowerCase() ?? '';
+
+  let data = PRICING_DATA.filter(c => {
+    if (countryF.length && !countryF.includes(c.country)) return false;
+    if (cityF.length && !cityF.includes(c.city)) return false;
+    if (houseF.length && !houseF.includes(c.name)) return false;
+    if (rmF.length && !rmF.includes(c.rm)) return false;
+    if (hmF.length && !hmF.includes(c.hm)) return false;
+    return true;
+  });
+
+  if (unitIdQuery) {
+    data = data.filter(house => {
+      let hasMatch = false;
+      for (const rt of house.roomTypes) {
+        const rtKey = house.id + rt.type;
+        for (const u of rt.units) {
+          if (u.id.toLowerCase().includes(unitIdQuery)) {
+            hasMatch = true;
+            expandedHouses.add(house.id);
+            expandedRoomTypes[rtKey] = true;
+          }
+        }
+      }
+      return hasMatch;
+    });
+  }
+
+  data.forEach(house => {
+    const houseOpen = expandedHouses.has(house.id);
+    const houseAlerts = unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg);
+
+    const tr = document.createElement('tr');
+    tr.className = 'row-property';
+    tr.innerHTML = `
+      <td>
+        <button class="expand-btn ${houseOpen ? 'open' : ''}" onclick="toggleHouse('${house.id}')">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
+        </button>
+        <strong>${house.name}</strong>
+        <button onclick="openCommAttrModal('${house.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;padding:0 4px;vertical-align:middle;" title="View house attributes">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><line x1="7" y1="6" x2="7" y2="10"/><circle cx="7" cy="4.5" r=".6" fill="currentColor"/></svg>
+        </button>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${house.availBeds}/${house.totalBeds}</span>
+      </td>
+      <td>
+        <span class="avail-pct" style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();toggleExposureForProp('${house.id}','${house.name.replace(/'/g,"\\'")}',${house.roomTypes[0].rate})">
+          ${house.availPct}%${parseFloat(house.availPct) > 12.0 ? ' <span class="warn-icon">\u26a0</span>' : ''}
+        </span>
+      </td>
+      <td></td><td></td>
+      <td>${alertsCellHtml(houseAlerts)}</td>
+      <td><a href="javascript:void(0)" onclick="openBookingModal({level:'house',houseId:'${house.id}'})" style="color:var(--accent);text-decoration:underline;">${house.sold.toLocaleString('en-GB')} / ${house.fcst.toLocaleString('en-GB')}</a></td>
+      <td>${paceCell(house.ros)}</td>
+      <td>${dlBadge(house.demand)}</td>
+      <td></td><td></td><td></td><td></td>
+      <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.absChange!=null?priceOverrides[house.id].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${house.id}','house',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
+      <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.pctChange!=null?priceOverrides[house.id].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${house.id}','house',{});this.blur();}" onblur="applyPctFormat(this)"></td>
+      <td></td>
+      <td></td>
+    `;
+    tb.appendChild(tr);
+
+    if (!houseOpen) return;
+
+    house.roomTypes.forEach(rt => {
+      const rtKey = house.id + rt.type;
+      const rtOpen = expandedRoomTypes[rtKey];
+      const rtAlerts = computeAlerts(rt, alertCfg);
+
+      const btr = document.createElement('tr');
+      btr.className = 'row-bedtype';
+      btr.innerHTML = `
+        <td>
+          <button class="expand-btn ${rtOpen ? 'open' : ''}" onclick="toggleRoomType('${rtKey}')">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
+          </button>
+          ${rt.type}
+          <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${rt.availBeds}/${rt.totalBeds}</span>
+        </td>
+        <td><span class="avail-pct" style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();toggleExposureForProp('${rtKey}','${house.name.replace(/'/g,"\\'")} &middot; ${rt.type}',${rt.rate})">${rt.availPct}%${parseFloat(rt.availPct) > 12.0 ? ' <span class="warn-icon">\u26a0</span>' : ''}</span></td>
+        <td></td><td></td>
+        <td>${alertsCellHtml(rtAlerts)}</td>
+        <td><a href="javascript:void(0)" onclick="openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})" style="color:var(--accent);text-decoration:underline;">${rt.sold} / ${rt.fcst}</a></td>
+        <td>${paceCell(rt.ros)}</td>
+        <td>${dlBadge(rt.demand)}</td>
+        <td></td>
+        <td style="text-align:right;color:var(--text-secondary);">${fmt(scaleMoveIn(rt.rate))}</td>
+        <td style="text-align:right;">${fmt(scaleMoveIn(computeRec(rt.rec, rtKey)))}</td>
+        <td>${(() => {
+          let up = 0, down = 0;
+          rt.units.forEach(u => { const a = recActionFor(u); if (a === 'Increase') up++; else if (a === 'Decrease') down++; });
+          if (!up && !down) return '<span style="color:var(--text-muted);font-size:12px;">\u2014</span>';
+          const parts = [];
+          if (up) parts.push('<span style="color:#166534;font-weight:600;">\u2191' + up + '</span>');
+          if (down) parts.push('<span style="color:#991b1b;font-weight:600;">\u2193' + down + '</span>');
+          return '<span style="font-size:12px;">' + parts.join(' ') + '</span>';
+        })()}</td>
+        <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.absChange!=null?priceOverrides[rtKey].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyEuroFormat(this)"></td>
+        <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.pctChange!=null?priceOverrides[rtKey].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyPctFormat(this)"></td>
+        <td>${noteCell(rtKey, rt.note)}</td>
+        <td><button type="button" onclick="event.stopPropagation();openRowCopilot(null,'${house.id}','${rt.type}')" title="Ask about this room type" style="background:none;border:none;cursor:pointer;padding:3px 4px;color:var(--text-muted);opacity:0.45;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;transition:opacity .15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.45'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M5.5 5.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5"/><circle cx="7" cy="11" r=".6" fill="currentColor"/></svg></button></td>
+      `;
+      tb.appendChild(btr);
+
+      if (!rtOpen) return;
+
+      const roomTypeF = document.getElementById('roomTypeFilter')?.value;
+      const vacantOn   = document.getElementById('statusVacant')?.checked;
+      const onNoticeOn = document.getElementById('statusOnNotice')?.checked;
+      const alertF    = document.getElementById('alertFilter')?.value;
+      const recF      = document.getElementById('recFilter')?.value;
+
+      const rtAlertTypes = new Set(rtAlerts.map(a => a.type));
+      const filteredUnits = rt.units.filter(unit => {
+        if (unitIdQuery && !unit.id.toLowerCase().includes(unitIdQuery)) return false;
+        if (roomTypeF && unit.roomType !== roomTypeF) return false;
+        if (vacantOn || onNoticeOn) {
+          const ok = (vacantOn && unit.status === 'vacant') || (onNoticeOn && unit.status === 'on notice');
+          if (!ok) return false;
+        }
+        if (alertF && !rtAlertTypes.has(alertF)) return false;
+        if (recF && recActionFor(unit) !== recF) return false;
+        return true;
+      });
+
+      filteredUnits.forEach(unit => {
+        const utr = document.createElement('tr');
+        utr.className = 'row-unit';
+        const statusCfg = { vacant: { label: 'VC', bg: '#f87171', color: '#fff' }, 'on notice': { label: 'ON', bg: '#94a3b8', color: '#fff' } };
+        const sCfg = statusCfg[unit.status] || statusCfg.vacant;
+        const statusBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;background:${sCfg.bg};color:${sCfg.color};font-size:9px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:1px 4px;min-width:20px;">${sCfg.label}</span>`;
+        const rcRules = getActiveRcRulesForUnit(house.id, rt.type, unit.id);
+        const rcBadge = rcRules.length
+          ? `<span title="${rcRules.map(r => r.name).join(' \u00b7 ').replace(/"/g, '&quot;')}" style="display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;color:#64748b;font-size:9px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:1px 4px;min-width:20px;">RC</span>`
+          : '';
+
+        const isLocked = !!(unit.lock && unit.lock.locked);
+        const effRecBase = effectiveRec(unit);
+        const effRecShown = scaleMoveIn(effRecBase);
+        const rateShown = scaleMoveIn(unit.rate);
+        const ov = priceOverrides[unit.id];
+        const hasOverride = !isLocked && ov && (ov.absChange != null || ov.pctChange != null);
+        const isInherited = ov?.inherited === true;
+        const rs = recStates[unit.id];
+        const hasModalOverride = !isLocked && rs && rs.state === 'overridden';
+        const lockIcon = `<svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="6.5" width="8" height="6" rx="1"/><path d="M4.5 6.5V4.5a2.5 2.5 0 0 1 5 0v2"/></svg>`;
+        let recCell;
+        if (isLocked) {
+          recCell = `<span class="rate-locked" title="Rec. rate is locked">
+              <a href="javascript:void(0)" onclick="openBookingModal({level:'unit',unitId:'${unit.id}'})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">${fmt(effRecShown)}</a>
+              ${lockIcon}
+            </span>`;
+        } else if (hasOverride || hasModalOverride) {
+          recCell = `<span style="background:rgba(232,0,125,0.08);border-radius:3px;padding:2px 4px;display:inline-block;">
+              <a href="javascript:void(0)" onclick="openBookingModal({level:'unit',unitId:'${unit.id}'})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">${fmt(effRecShown)}</a>
+              ${isInherited ? '<svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="vertical-align:middle;margin-left:2px;"><path d="M5 9a3 3 0 0 0 4 0l2-2a3 3 0 0 0-4-4L6 4"/><path d="M9 5a3 3 0 0 0-4 0L3 7a3 3 0 0 0 4 4l1-1"/></svg>' : ''}
+              <span style="text-decoration:line-through;color:var(--text-muted);font-size:10.5px;display:block;">${fmt(scaleMoveIn(unit.rec))}</span>
+            </span>`;
+        } else {
+          recCell = `<a href="javascript:void(0)" onclick="openBookingModal({level:'unit',unitId:'${unit.id}'})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">${fmt(effRecShown)}</a>`;
+        }
+        utr.innerHTML = `
+          <td>${unit.id}<span style="font-size:10.5px;color:var(--text-muted);margin-left:6px;">${unit.area}m\u00b2 \u00b7 Fl ${unit.floor}</span></td>
+          <td></td>
+          <td style="text-align:center;">${rcBadge}</td>
+          <td>${statusBadge}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><span class="stay-link" onclick="openStayModal('${unit.id}')">Full Year</span></td>
+          <td style="text-align:right;"><span onclick="openUnitRateHistory('${unit.id}')" title="View rate history" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">${fmt(rateShown)}</span></td>
+          <td style="text-align:right;">${recCell}</td>
+          <td>${recActionChip(recActionFor(unit), recStateTag(unit.id) || (hasOverride ? '<span class="rec-state-tag t-overridden" title="Manual price change applied">OVR</span>' : ''))}</td>
+          <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${ov?.absChange!=null?ov.absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${unit.id}','unit',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
+          <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${ov?.pctChange!=null?ov.pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${unit.id}','unit',{});this.blur();}" onblur="applyPctFormat(this)"></td>
+          <td>${unitNotesCell(unit)}</td>
+          <td><button type="button" onclick="event.stopPropagation();openRowCopilot('${unit.id}','${house.id}','${rt.type}')" title="Ask about this unit" style="background:none;border:none;cursor:pointer;padding:3px 4px;color:var(--text-muted);opacity:0.45;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;transition:opacity .15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.45'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M5.5 5.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5"/><circle cx="7" cy="11" r=".6" fill="currentColor"/></svg></button></td>
+        `;
+        tb.appendChild(utr);
+      });
+    });
+  });
+
+  renderStatsBar(data);
+}
+
+function toggleHouse(id) {
+  if (expandedHouses.has(id)) expandedHouses.delete(id);
+  else expandedHouses.add(id);
+  renderTable();
+}
+
+function toggleRoomType(key) {
+  expandedRoomTypes[key] = !expandedRoomTypes[key];
+  renderTable();
+}
+</script>
+
+<script>
+// ── Stay Type Modal ───────────────────────────────────────
+let stayChartInst = null;
+
+function openStayModal(unitId) {
+  const found = findUnitInPricingData(unitId);
+  if (!found) return;
+  const unit = found.unit;
+  document.getElementById('stayModalUnit').textContent = unitId + ' \u00b7 ' + found.house.name + ' \u00b7 ' + unit.roomType;
+  document.getElementById('stayModalMoveIn').textContent = 'Reference rate: ' + fmt(unit.rate) + '/mo (Full Year \u00b7 Sep 1)';
+
+  const labels = STAY_TYPES.map(s => s.short);
+  const sepPrices = STAY_TYPES.map(s => priceFor(unit.rate, s.id, 'sep1'));
+  const octPrices = STAY_TYPES.map(s => priceFor(unit.rate, s.id, 'oct1'));
+
+  // Table: rows = move-in dates, columns = stay types
+  const defIdx = STAY_TYPES.findIndex(s => s.id === DEFAULT_STAY_TYPE);
+  const thead = `
+    <thead>
+      <tr style="height:36px;">
+        <th style="padding:8px 12px;font-size:12px;font-weight:700;color:var(--text-primary);text-align:left;border-bottom:2px solid var(--border);">Move-in</th>
+        ${STAY_TYPES.map((s, i) => `<th style="padding:7px 8px;text-align:center;font-size:12px;font-weight:700;border-bottom:2px solid var(--border);${i === defIdx ? 'background:rgba(232,0,125,0.12);color:var(--accent);border-top:2px solid var(--accent);' : 'color:var(--text-primary);'}">${s.label}${i === defIdx ? '<div style="font-size:9px;color:var(--accent);font-weight:600;margin-top:1px;">\u2605 Default</div>' : ''}<div style="font-size:10px;color:var(--text-muted);font-weight:400;margin-top:1px;">${s.months} mo${s.premiumPct !== 0 ? ' \u00b7 ' + (s.premiumPct > 0 ? '+' : '') + s.premiumPct + '%' : ''}</div></th>`).join('')}
+      </tr>
+    </thead>`;
+  const mkRow = (mi, prices, isSelected) => `
+    <tr style="height:38px;${isSelected ? 'background:rgba(232,0,125,0.03);' : ''}">
+      <td style="padding:8px 12px;font-size:12.5px;font-weight:600;vertical-align:middle;white-space:nowrap;">${mi.label}${mi.premiumPct > 0 ? ` <span style="font-size:10px;color:var(--text-muted);font-weight:400;">(+${mi.premiumPct}% hold)</span>` : ''}${isSelected ? ' <span style="font-size:9px;font-weight:700;color:var(--accent);">DEFAULT</span>' : ''}</td>
+      ${prices.map((p, i) => `<td style="padding:7px 8px;text-align:center;font-size:13px;font-weight:${i === defIdx ? '700' : '500'};vertical-align:middle;${i === defIdx ? 'background:rgba(232,0,125,0.05);' : ''}">${fmt(p)}</td>`).join('')}
+    </tr>`;
+  document.getElementById('stayTable').innerHTML = thead + '<tbody>' +
+    mkRow(MOVE_IN_DATES[0], sepPrices, currentMoveIn === 'sep1') +
+    mkRow(MOVE_IN_DATES[1], octPrices, currentMoveIn === 'oct1') +
+    '</tbody>';
+
+  if (stayChartInst) stayChartInst.destroy();
+  stayChartInst = new Chart(document.getElementById('stayChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Sep 1 move-in',
+          data: sepPrices,
+          backgroundColor: STAY_TYPES.map(s => s.id === DEFAULT_STAY_TYPE ? '#e8007d' : 'rgba(232,0,125,0.55)'),
+          borderRadius: 4,
+          maxBarThickness: 52,
+        },
+        {
+          label: 'Oct 1 move-in (+5% hold)',
+          data: octPrices,
+          backgroundColor: 'rgba(96,165,250,0.75)',
+          borderRadius: 4,
+          maxBarThickness: 52,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, font: { family: 'Inter', size: 11 }, color: '#6b7280' } },
+        tooltip: {
+          backgroundColor: '#1a1d23', borderColor: '#2a2d35', borderWidth: 1,
+          titleColor: '#e5e7eb', bodyColor: '#9ca3af', padding: 10,
+          titleFont: { family: 'Inter', size: 12 }, bodyFont: { family: 'Inter', size: 11 },
+          callbacks: {
+            title: items => STAY_TYPES[items[0].dataIndex].label,
+            label: ctx => ' ' + ctx.dataset.label + ': \u20ac' + ctx.parsed.y.toLocaleString('en-GB') + '/mo',
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { family: 'Inter', size: 11 } }, grid: { display: false } },
+        y: {
+          ticks: { color: '#6b7280', font: { family: 'Inter', size: 10 }, callback: v => '\u20ac' + v.toLocaleString('en-GB') },
+          grid: { color: '#e4e6eb' },
+        }
+      }
+    }
+  });
+
+  openModal('stayModal');
+}
+
+// ── Modals ────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── House Attributes Modal ────────────────────────────────
+const AMENITY_ICONS = {
+  'Rooftop Terrace': '<path d="M2 8l5-5 5 5"/><rect x="4" y="8" width="6" height="5"/>',
+  'Study Rooms': '<rect x="2" y="4" width="10" height="7" rx="1"/><line x1="5" y1="11" x2="5" y2="13"/><line x1="9" y1="11" x2="9" y2="13"/>',
+  'Movie Lounge': '<rect x="2" y="3" width="10" height="8" rx="1"/><polygon points="6,5.5 9,7 6,8.5" fill="currentColor" stroke="none"/>',
+  'Community Kitchen': '<circle cx="7" cy="7" r="5"/><line x1="7" y1="4" x2="7" y2="7"/><line x1="7" y1="7" x2="9" y2="9"/>',
+  'Laundry Room': '<rect x="3" y="2" width="8" height="10" rx="1"/><circle cx="7" cy="8" r="2.5"/>',
+  'Gym': '<circle cx="4" cy="7" r="1.5"/><circle cx="10" cy="7" r="1.5"/><line x1="5.5" y1="7" x2="8.5" y2="7"/>',
+  'Bike Storage': '<circle cx="4" cy="9" r="2.5"/><circle cx="10" cy="9" r="2.5"/><path d="M4 9l3-4 3 4"/>',
+  'Package Service': '<rect x="2" y="4" width="10" height="8" rx="1"/><line x1="7" y1="4" x2="7" y2="12"/>',
+  'Game Zone': '<rect x="2" y="5" width="10" height="6" rx="2"/><line x1="4.5" y1="8" x2="6.5" y2="8"/><line x1="5.5" y1="7" x2="5.5" y2="9"/><circle cx="9.5" cy="8" r=".7" fill="currentColor"/>',
+  'Co-working Space': '<rect x="2" y="4" width="10" height="7" rx="1"/><line x1="5" y1="11" x2="5" y2="13"/><line x1="9" y1="11" x2="9" y2="13"/><line x1="3" y1="13" x2="11" y2="13"/>',
+  'Music Room': '<circle cx="5" cy="10" r="2"/><path d="M7 10V3l4 1v5"/>',
+  'Courtyard': '<circle cx="7" cy="5" r="2.5"/><path d="M7 7.5V13M4.5 10H9.5"/>',
+};
+
+function openCommAttrModal(houseId) {
+  const house = HOUSES.find(c => c.id === houseId);
+  if (!house) return;
+  const cp = PRICING_DATA.find(p => p.id === houseId);
+  document.getElementById('commAttrName').textContent = house.name;
+  const facts = [
+    { label: 'City', value: house.city },
+    { label: 'Country', value: house.country },
+    { label: 'Year Built', value: house.yearBuilt ?? '\u2014' },
+    { label: 'Total Beds', value: house.totalBeds ?? '\u2014' },
+    { label: 'Revenue Manager', value: house.rm },
+    { label: 'House Manager', value: house.hm },
+  ];
+  document.getElementById('commAttrFacts').innerHTML = facts.map(f => `
+    <div style="background:var(--body-bg);border-radius:6px;border:1px solid var(--border);padding:8px 10px;">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">${f.label}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${f.value}</div>
+    </div>
+  `).join('');
+  document.getElementById('commAttrAmenities').innerHTML =
+    (house.amenities ?? []).map(a => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(232,0,125,0.07);color:var(--accent);border:1px solid rgba(232,0,125,0.2);border-radius:20px;padding:4px 10px;font-size:12px;font-weight:500;">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">${AMENITY_ICONS[a] ?? '<circle cx="7" cy="7" r="5"/>'}</svg>
+        ${a}
+      </span>
+    `).join('');
+  openModal('commAttrModal');
+}
+</script>
+
+<script>
+// ── Booking Curve Modal ───────────────────────────────────
+const bcBackdrop = document.getElementById('bcBackdrop');
+let activeBcModal = null;   // { level, house, roomType?, unit? }
+let bcOverrideValue = null;
+
+function fmtInt(n) { return Math.round(n).toLocaleString('en-GB'); }
+function fmtEurK(n) {
+  if (Math.abs(n) >= 100000) return '\u20ac' + Math.round(n / 1000).toLocaleString('en-GB') + 'k';
+  return '\u20ac' + Math.round(n).toLocaleString('en-GB');
+}
+
+function openBookingModal(opts) {
+  let house = null, roomType = null, unit = null;
+  if (opts.level === 'unit') {
+    const found = findUnitInPricingData(opts.unitId);
+    if (!found) return;
+    house = found.house; roomType = found.roomType; unit = found.unit;
+  } else if (opts.level === 'roomtype') {
+    house = PRICING_DATA.find(h => h.id === opts.houseId);
+    roomType = house?.roomTypes.find(rt => rt.type === opts.roomType);
+    if (!roomType) return;
+  } else {
+    house = PRICING_DATA.find(h => h.id === opts.houseId);
+    if (!house) return;
+  }
+  activeBcModal = { level: opts.level, house, roomType, unit };
+  bcOverrideValue = null;
+  renderBcModal();
+  bcBackdrop.classList.add('is-open');
+  bcBackdrop.setAttribute('aria-hidden', 'false');
+  document.addEventListener('keydown', onBcKey);
+}
+function closeBcModal() {
+  activeBcModal = null;
+  bcOverrideValue = null;
+  bcBackdrop.classList.remove('is-open');
+  bcBackdrop.setAttribute('aria-hidden', 'true');
+  document.removeEventListener('keydown', onBcKey);
+}
+function onBcKey(e) {
+  if (e.key === 'Escape') { e.stopPropagation(); closeBcModal(); }
+}
+bcBackdrop.addEventListener('click', e => {
+  if (e.target === bcBackdrop) closeBcModal();
+});
+
+// Booking curves exist at house and room-type level only. A unit-level
+// modal shows its room type's curves + demand alongside the unit's own
+// price recommendation.
+function bcModalRoomTypes() {
+  if (!activeBcModal) return [];
+  const { level, house, roomType } = activeBcModal;
+  if (level === 'house') return house.roomTypes;
+  return [roomType];
+}
+
+function aggregateBcData(house, rts) {
+  const curves = rts.map(rt => bookingCurveData(house.id + '|' + rt.type, rt.sold, rt.fcst, rt.ros));
+  const N = curves[0].actualSeries.length;
+  const M = curves[0].weekly.length;
+  const sumAt = (key, len) => Array.from({ length: len }, (_, i) =>
+    curves.reduce((s, c) => s + c[key][i], 0));
+  const sold = rts.reduce((s, rt) => s + rt.sold, 0);
+  const fcst = rts.reduce((s, rt) => s + rt.fcst, 0);
+  const lastYear = curves.reduce((s, c) => s + c.benchmarkTotal, 0);
+  const revCur = rts.reduce((s, rt) => s + rt.sold * scaleMoveIn(rt.rate), 0);
+  const revFcst = rts.reduce((s, rt) => s + rt.fcst * scaleMoveIn(rt.rate), 0);
+  const revW = rts.reduce((s, rt) => s + rt.sold * rt.rate, 0);
+  const ros = revW ? Math.round(rts.reduce((s, rt) => s + rt.ros * rt.sold * rt.rate, 0) / revW) : 0;
+  return {
+    actualSeries: sumAt('actualSeries', N),
+    benchmarkSeries: sumAt('benchmarkSeries', N),
+    weekly: sumAt('weekly', M),
+    weeklyBenchmark: sumAt('weeklyBenchmark', M),
+    weekLabels: curves[0].weekLabels,
+    cmp: {
+      units: { current: sold, forecast: fcst, lastYear },
+      revenue: { current: revCur, forecast: revFcst, lastYear: Math.round(revCur / Math.max(1, sold) * lastYear) },
+      ros: { current: ros },
+    },
+  };
+}
+
+// ── SVG charts (inline, ported from the demand-pace modal) ──
+function bookingCurveSvg(actual, benchmark) {
+  const W = 520, H = 200;
+  const padL = 36, padR = 12, padT = 14, padB = 26;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const N = actual.length;
+  const maxY = Math.max(...actual, ...benchmark, 1);
+
+  const xAt = i => padL + (innerW * i) / (N - 1);
+  const yAt = v => padT + innerH * (1 - v / maxY);
+  const buildPath = arr => arr.map((v, i) => (i === 0 ? 'M' : 'L') + xAt(i) + ',' + yAt(v)).join(' ');
+
+  const ticks = 4;
+  const tickLines = Array.from({ length: ticks + 1 }, (_, i) => {
+    const y = padT + (innerH * i) / ticks;
+    const v = Math.round(maxY * (1 - i / ticks));
+    return '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#eef0f5" stroke-width="1"/>' +
+           '<text x="' + (padL - 6) + '" y="' + (y + 3) + '" font-size="9" fill="#9ca3af" text-anchor="end" font-family="Inter">' + v.toLocaleString('en-GB') + '</text>';
+  }).join('');
+
+  const xLabels = Array.from({ length: N }, (_, i) => {
+    if (i % 3 !== 0 && i !== N - 1) return '';
+    const x = xAt(i);
+    const label = i === N - 1 ? 'today' : 'W\u2212' + (N - 1 - i);
+    return '<text x="' + x + '" y="' + (H - 8) + '" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Inter">' + label + '</text>';
+  }).join('');
+
+  return (
+    '<svg class="chart-demand" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      'data-w="' + W + '" data-h="' + H + '" data-padl="' + padL + '" data-padr="' + padR + '" data-padt="' + padT + '" data-padb="' + padB + '" data-maxy="' + maxY + '">' +
+      tickLines +
+      '<path d="' + buildPath(benchmark) + '" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>' +
+      '<path d="' + buildPath(actual)    + '" stroke="#e8007d" stroke-width="2"   fill="none"/>' +
+      xLabels +
+      '<line class="chart-guide" x1="0" y1="' + padT + '" x2="0" y2="' + (H - padB) + '" stroke="rgba(232,0,125,0.5)" stroke-width="1" style="display:none"/>' +
+      '<g class="chart-markers" style="display:none">' +
+        '<circle r="4" fill="#9ca3af" stroke="#fff" stroke-width="1.5"/>' +
+        '<circle r="4" fill="#e8007d" stroke="#fff" stroke-width="1.5"/>' +
+      '</g>' +
+    '</svg>'
+  );
+}
+
+function weeklyBarsSvg(values, labels, benchmarks) {
+  const W = 520, H = 160;
+  const padL = 36, padR = 12, padT = 14, padB = 30;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const N = values.length;
+  const maxV = Math.max(...values, ...(benchmarks || []), 1);
+  const gap = 8;
+  const bw = (innerW - gap * (N - 1)) / N;
+
+  const ticks = 4;
+  const tickLines = Array.from({ length: ticks + 1 }, (_, i) => {
+    const y = padT + (innerH * i) / ticks;
+    const v = Math.round(maxV * (1 - i / ticks));
+    return '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#eef0f5" stroke-width="1"/>' +
+           '<text x="' + (padL - 6) + '" y="' + (y + 3) + '" font-size="9" fill="#9ca3af" text-anchor="end" font-family="Inter">' + v + '</text>';
+  }).join('');
+
+  const bars = values.map((v, i) => {
+    const x = padL + i * (bw + gap);
+    const h = innerH * (v / maxV);
+    const y = padT + innerH - h;
+    let benchTick = '';
+    if (benchmarks && benchmarks.length === N) {
+      const b = benchmarks[i];
+      const benchY = padT + innerH * (1 - b / maxV);
+      const tickColor = b <= v ? '#2563eb' : '#dc2626';
+      benchTick = '<line x1="' + (x - 3) + '" y1="' + benchY + '" x2="' + (x + bw + 3) + '" y2="' + benchY +
+        '" stroke="' + tickColor + '" stroke-width="2" stroke-linecap="round"/>';
+    }
+    return '<rect class="bar" data-i="' + i + '" x="' + x + '" y="' + y + '" width="' + bw + '" height="' + h + '" rx="2" fill="#e8007d" fill-opacity="0.85"/>' +
+           benchTick +
+           '<text x="' + (x + bw / 2) + '" y="' + (H - 14) + '" font-size="9" fill="#1a1d23" text-anchor="middle" font-family="Inter" font-weight="500">' + labels[i].num + '</text>';
+  }).join('');
+
+  return (
+    '<svg class="chart-weekly" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+      tickLines + bars +
+    '</svg>'
+  );
+}
+
+// Hover tooltip for the weekly-bookings bars (ported from the demand-pace demo)
+function wireWeeklyTooltip(svg, data) {
+  if (!svg) return;
+  const container = svg.parentElement;
+  const tip = document.createElement('div');
+  tip.className = 'chart-tooltip';
+  container.appendChild(tip);
+  const bars = [...svg.querySelectorAll('rect.bar')];
+
+  function hide() { tip.style.display = 'none'; bars.forEach(b => b.setAttribute('fill-opacity', '0.85')); }
+
+  function show(i, e) {
+    const rect = container.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    bars.forEach((b, j) => b.setAttribute('fill-opacity', j === i ? '1' : '0.5'));
+    const v = data.weekly[i];
+    const bench = data.weeklyBenchmark ? data.weeklyBenchmark[i] : null;
+    const lbl = data.weekLabels[i];
+    const header = 'Week of ' + lbl.num;
+    let body =
+      '<div class="chart-tooltip-row emphasized">' +
+        '<span class="swatch" style="background:#e8007d"></span>' +
+        '<span class="label">Actual</span>' +
+        '<span class="value">' + v + ' bookings</span>' +
+      '</div>';
+    if (bench != null) {
+      const delta = bench > 0 ? ((v - bench) / bench) * 100 : 0;
+      const deltaR = Math.round(delta * 10) / 10;
+      const tickColor = bench <= v ? '#2563eb' : '#dc2626';
+      const deltaColor = deltaR >= 0 ? '#86efac' : '#fca5a5';
+      body +=
+        '<div class="chart-tooltip-row">' +
+          '<span class="swatch" style="background:' + tickColor + '"></span>' +
+          '<span class="label">Benchmark</span>' +
+          '<span class="value">' + bench + ' bookings</span>' +
+        '</div>' +
+        '<div class="chart-tooltip-row">' +
+          '<span class="swatch" style="background:transparent"></span>' +
+          '<span class="label">Delta</span>' +
+          '<span class="value" style="color:' + deltaColor + '">' + (deltaR > 0 ? '+' : '') + deltaR + '%</span>' +
+        '</div>';
+    }
+    tip.innerHTML = '<div class="chart-tooltip-header">' + header + '</div>' + body;
+    tip.style.display = 'block';
+    const tipR = tip.getBoundingClientRect();
+    let tx = px + 12, ty = py + 12;
+    if (tx + tipR.width  > rect.width)  tx = px - tipR.width  - 12;
+    if (ty + tipR.height > rect.height) ty = py - tipR.height - 12;
+    tip.style.left = Math.max(0, tx) + 'px';
+    tip.style.top  = Math.max(0, ty) + 'px';
+  }
+  bars.forEach((b, i) => {
+    b.addEventListener('mousemove', e => show(i, e));
+    b.addEventListener('mouseleave', hide);
+  });
+  container.addEventListener('mouseleave', hide);
+}
+
+function renderBcModal() {
+  if (!activeBcModal) return;
+  const { level, house, roomType, unit } = activeBcModal;
+  const rts = bcModalRoomTypes();
+  const m = aggregateBcData(house, rts);
+  const mi = moveInById(currentMoveIn);
+
+  let title, subtitle;
+  if (level === 'unit') {
+    title = esc(house.name) + ' \u2014 ' + esc(unit.id);
+    subtitle = esc(unit.roomType) + ' \u00b7 ' + unit.area + 'm\u00b2 \u00b7 Floor ' + unit.floor +
+      ' \u00b7 Curves &amp; demand: ' + esc(unit.roomType) + ' cluster \u00b7 Booking season 2026/27';
+  } else if (level === 'roomtype') {
+    title = esc(house.name) + ' \u2014 ' + esc(roomType.type);
+    subtitle = roomType.units.length + ' units \u00b7 ' + roomType.totalBeds + ' beds \u00b7 Booking season 2026/27';
+  } else {
+    title = esc(house.name);
+    subtitle = house.roomTypes.length + ' room types \u00b7 ' + house.totalBeds + ' beds \u00b7 aggregate \u00b7 Booking season 2026/27';
+  }
+
+  // Demand + alerts panels — always room-type / house level signals
+  const demandScore = level === 'house' ? house.demand : roomType.demand;
+  const dl = demandLevelForScore(demandScore);
+  const dlColor = { 5: '#14532d', 4: '#166534', 3: '#64748b', 2: '#1d4ed8', 1: '#1e3a8a' }[dl.level];
+  const alerts = level === 'house'
+    ? unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg)
+    : computeAlerts(roomType, alertCfg);
+  const alertsHtml = alerts.length
+    ? alerts.map(a =>
+        '<div class="bc-alert-item"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#f5a623" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;">' + (alertConfig[a.type]?.icon || '') + '</svg><span><strong>' + esc(a.label) + '.</strong> ' + esc(a.tooltip) + '</span></div>'
+      ).join('')
+    : '<div style="font-size:12px;color:var(--text-muted);">No active alerts.</div>';
+
+  // Recommendation panel
+  let recPanelHtml;
+  if (level === 'unit') {
+    const rs = recStates[unit.id] || {};
+    const isLocked = !!(unit.lock && unit.lock.locked);
+    const recBase = effectiveRec(unit);
+    const recShown = scaleMoveIn(recBase);
+    const curShown = scaleMoveIn(unit.rate);
+    const pctChange = curShown ? ((recShown - curShown) / curShown) * 100 : 0;
+    const pctR = Math.round(pctChange * 10) / 10;
+    const pctClass = pctR > 1 ? 'cell-pos' : (pctR < -1 ? 'cell-neg' : '');
+    const acceptSolid = rs.state === 'accepted' ? 'solid' : '';
+    const rejectSolid = rs.state === 'rejected' ? 'solid' : '';
+    const stateTag =
+      rs.state === 'accepted'   ? '<span class="rec-state-tag t-accepted">Accepted</span>' :
+      rs.state === 'rejected'   ? '<span class="rec-state-tag t-rejected">Rejected</span>' :
+      rs.state === 'overridden' ? '<span class="rec-state-tag t-overridden">Overridden</span>' : '';
+    recPanelHtml =
+      '<div class="bc-panel">' +
+        '<div class="bc-panel-title">Price recommendation' + stateTag + '</div>' +
+        (isLocked ? '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;">\ud83d\udd12 Rate locked' + (unit.lock.reason ? ' \u2014 ' + esc(unit.lock.reason) : '') + '</div>' : '') +
+        '<div class="bc-rec-row"><span class="label">Current rate</span><span class="value">' + fmt(curShown) + '</span></div>' +
+        '<div class="bc-rec-row"><span class="label">Recommended</span><span class="value">' + fmt(recShown) + '</span></div>' +
+        '<div class="bc-rec-row"><span class="label">% change</span><span class="value pct ' + pctClass + '">' + (pctR > 0 ? '+' : '') + pctR + '%</span></div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Driven by ' + esc(unit.roomType) + ' demand: ' + dl.code + ' \u2014 ' + esc(dl.label.toLowerCase()) + '.</div>' +
+        (!isLocked ?
+          '<div class="bc-override-row">' +
+            '<label for="bcOverride">Override:</label>' +
+            '<input type="text" class="bc-override-input" id="bcOverride" inputmode="decimal" ' +
+              'value="' + (bcOverrideValue != null ? bcOverrideValue : (rs.state === 'overridden' && typeof rs.overrideValue === 'number' ? scaleMoveIn(rs.overrideValue) : '')) + '" ' +
+              'placeholder="' + fmt(scaleMoveIn(unit.rec)) + '">' +
+          '</div>' +
+          '<div class="bc-actions">' +
+            '<button class="bc-btn bc-btn-reject ' + rejectSolid + '" type="button" id="bcReject">Reject</button>' +
+            '<button class="bc-btn bc-btn-accept ' + acceptSolid + '" type="button" id="bcAccept">Accept</button>' +
+          '</div>'
+        : '') +
+      '</div>';
+  } else {
+    recPanelHtml =
+      '<div class="bc-panel">' +
+        '<div class="bc-panel-title">Price recommendation</div>' +
+        '<div style="color:var(--text-secondary);font-size:13px;line-height:1.5;padding:6px 0;">' +
+          'Aggregate view \u2014 review units individually.' +
+          '<br><span style="color:var(--text-muted);font-size:12px;">Expand the row to act on each unit\u2019s recommendation.</span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  const c = m.cmp;
+  const html =
+    '<div class="bc-modal" role="dialog" aria-modal="true">' +
+      '<header class="bc-header">' +
+        '<div>' +
+          '<div class="bc-title">' + title + '</div>' +
+          '<div class="bc-subtitle">' + subtitle + '</div>' +
+        '</div>' +
+        '<button class="bc-close" type="button" id="bcCloseBtn" aria-label="Close">' +
+          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+            '<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>' +
+          '</svg>' +
+        '</button>' +
+      '</header>' +
+      '<div class="bc-body">' +
+        '<div class="bc-col">' +
+          '<div class="bc-panel">' +
+            '<div class="bc-panel-title">Booking curve \u00b7 ' + esc(level === 'house' ? 'all room types' : (level === 'unit' ? unit.roomType : roomType.type)) + ' \u00b7 season to date</div>' +
+            '<div class="bc-legend">' +
+              '<span><span class="swatch" style="background:#e8007d"></span>This year</span>' +
+              '<span><span class="swatch" style="background:#9ca3af;border:1px dashed #9ca3af"></span>Benchmark (last year)</span>' +
+            '</div>' +
+            '<div class="bc-chart-area">' + bookingCurveSvg(m.actualSeries, m.benchmarkSeries) + '</div>' +
+          '</div>' +
+          '<div class="bc-panel">' +
+            '<div class="bc-panel-title">Last 7 weeks \u00b7 bookings per week</div>' +
+            '<div class="bc-legend">' +
+              '<span><span class="swatch" style="background:#e8007d"></span>Actual bookings</span>' +
+              '<span><span class="bc-legend-tick"></span>Benchmark (above/below)</span>' +
+            '</div>' +
+            '<div class="bc-chart-area">' + weeklyBarsSvg(m.weekly, m.weekLabels, m.weeklyBenchmark) + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="bc-col">' +
+          '<div class="bc-panel">' +
+            '<div class="bc-panel-title">Demand level \u00b7 ' + esc(level === 'house' ? 'house' : (level === 'unit' ? unit.roomType : roomType.type)) + '</div>' +
+            '<div class="bc-dl-big">' +
+              '<span class="bc-dl-code" style="color:' + dlColor + '">' + dl.code + '</span>' +
+              '<span class="bc-dl-text"><strong>' + esc(dl.label) + '.</strong> ' + esc(dl.interp) + ' (forecast ' + signedPpt(demandPpt(demandScore)) + ' vs expected).</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="bc-panel">' +
+            '<div class="bc-panel-title">Comparison</div>' +
+            '<table class="bc-compare">' +
+              '<thead><tr><th></th><th>Current</th><th>Forecast</th><th>Last yr</th></tr></thead>' +
+              '<tbody>' +
+                '<tr><td>Beds</td>' +
+                  '<td>' + fmtInt(c.units.current)  + '</td>' +
+                  '<td>' + fmtInt(c.units.forecast) + '</td>' +
+                  '<td>' + fmtInt(c.units.lastYear) + '</td></tr>' +
+                '<tr><td>Revenue /mo</td>' +
+                  '<td>' + fmtEurK(c.revenue.current)  + '</td>' +
+                  '<td>' + fmtEurK(c.revenue.forecast) + '</td>' +
+                  '<td>' + fmtEurK(c.revenue.lastYear) + '</td></tr>' +
+                '<tr><td>Pace</td>' +
+                  '<td>' + (c.ros.current > 0 ? '+' : '') + c.ros.current + '%</td>' +
+                  '<td>0%</td>' +
+                  '<td>\u2014</td></tr>' +
+              '</tbody>' +
+            '</table>' +
+          '</div>' +
+          recPanelHtml +
+          '<div class="bc-panel">' +
+            '<div class="bc-panel-title">Alerts</div>' +
+            '<div class="bc-alert-list">' + alertsHtml + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  bcBackdrop.innerHTML = html;
+
+  document.getElementById('bcCloseBtn').addEventListener('click', closeBcModal);
+
+  if (level === 'unit' && !(unit.lock && unit.lock.locked)) {
+    document.getElementById('bcAccept').addEventListener('click', () => {
+      if (bcOverrideValue != null && !isNaN(bcOverrideValue) && bcOverrideValue > 0) {
+        // Store the override in Full-Year/Sep-1 reference terms
+        const mi2 = moveInById(currentMoveIn);
+        const refVal = Math.round(bcOverrideValue / (1 + mi2.premiumPct / 100));
+        recStates[unit.id] = { state: 'overridden', overrideValue: refVal };
+      } else {
+        const cur = recStates[unit.id];
+        if (cur && cur.state === 'accepted') delete recStates[unit.id];
+        else recStates[unit.id] = { state: 'accepted' };
+      }
+      bcOverrideValue = null;
+      renderBcModal();
+      renderTableInPlace();
+    });
+    document.getElementById('bcReject').addEventListener('click', () => {
+      const cur = recStates[unit.id];
+      if (cur && cur.state === 'rejected') delete recStates[unit.id];
+      else recStates[unit.id] = { state: 'rejected' };
+      bcOverrideValue = null;
+      renderBcModal();
+      renderTableInPlace();
+    });
+    const ovIn = document.getElementById('bcOverride');
+    ovIn.addEventListener('input', () => {
+      ovIn.value = ovIn.value.replace(/[^0-9.,]/g, '');
+      const n = parseFloat(ovIn.value.replace(',', '.'));
+      bcOverrideValue = isNaN(n) ? null : n;
+    });
+  }
+
+  wireBookingCurveTooltip(bcBackdrop.querySelector('.chart-demand'), m);
+  wireWeeklyTooltip(bcBackdrop.querySelector('.chart-weekly'), m);
+}
+
+// ── Chart tooltip wiring (booking curve) ──
+function wireBookingCurveTooltip(svg, data) {
+  if (!svg) return;
+  const container = svg.parentElement;
+  const ds = svg.dataset;
+  const W = +ds.w, H = +ds.h;
+  const padL = +ds.padl, padR = +ds.padr, padT = +ds.padt, padB = +ds.padb;
+  const innerW = W - padL - padR;
+  const maxY = +ds.maxy;
+  const innerH = H - padT - padB;
+  const N = data.actualSeries.length;
+  const yAt = v => padT + innerH * (1 - v / maxY);
+
+  const guide = svg.querySelector('.chart-guide');
+  const markersG = svg.querySelector('.chart-markers');
+  const markers = [...markersG.querySelectorAll('circle')];
+  const tip = document.createElement('div');
+  tip.className = 'chart-tooltip';
+  container.appendChild(tip);
+
+  function hide() {
+    guide.style.display = 'none';
+    markersG.style.display = 'none';
+    tip.style.display = 'none';
+  }
+  function onMove(e) {
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0) return hide();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const sx = px * (W / rect.width);
+    const sy = py * (H / rect.height);
+    if (sx < padL || sx > W - padR || sy < padT || sy > H - padB) return hide();
+    const i = Math.max(0, Math.min(N - 1, Math.round((sx - padL) / innerW * (N - 1))));
+    const snapVbX = padL + innerW * (i / (N - 1));
+    guide.setAttribute('x1', snapVbX);
+    guide.setAttribute('x2', snapVbX);
+    guide.style.display = '';
+
+    const series = [
+      { name: 'Benchmark', color: '#9ca3af', value: data.benchmarkSeries[i] },
+      { name: 'This year', color: '#e8007d', value: data.actualSeries[i] },
+    ];
+    series.forEach((s, idx) => {
+      markers[idx].setAttribute('cx', snapVbX);
+      markers[idx].setAttribute('cy', yAt(s.value));
+      markers[idx].setAttribute('fill', s.color);
+    });
+    markersG.style.display = '';
+
+    const weekLabel = i === N - 1 ? 'This week' : 'W\u2212' + (N - 1 - i);
+    tip.innerHTML =
+      '<div class="chart-tooltip-header">' + weekLabel + '</div>' +
+      series.map(s =>
+        '<div class="chart-tooltip-row">' +
+          '<span class="swatch" style="background:' + s.color + '"></span>' +
+          '<span class="label">' + s.name + '</span>' +
+          '<span class="value">' + s.value.toLocaleString('en-GB') + '</span>' +
+        '</div>'
+      ).join('');
+    tip.style.display = 'block';
+    const tipW = tip.offsetWidth || 140;
+    let left = px + 14;
+    if (left + tipW > rect.width - 4) left = px - tipW - 14;
+    tip.style.left = left + 'px';
+    tip.style.top = Math.max(2, py - 20) + 'px';
+  }
+  container.addEventListener('mousemove', onMove);
+  container.addEventListener('mouseleave', hide);
+}
+</script>
+
+<script>
+// ── Occupancy & Rate Panel ────────────────────────────────
+let currentExposureBaseRate = 1200;
+
+function toggleExposureForProp(key, label, baseRate) {
+  if (exposureOpen && !document.getElementById('exposurePanel').classList.contains('panel-closed') && exposurePropId === key) {
+    toggleExposure();
+    exposurePropId = null;
+    return;
+  }
+  if (unitPricingOpen) toggleUnitPricing();
+  document.getElementById('exposurePropName').textContent = label;
+  exposurePropId = key;
+  currentExposureBaseRate = baseRate;
+
+  if (window.exposureChartInst) { window.exposureChartInst.destroy(); window.exposureChartInst = null; }
+  if (window.compChartInst) { window.compChartInst.destroy(); window.compChartInst = null; }
+
+  const panel = document.getElementById('exposurePanel');
+  const wasAlreadyOpen = exposureOpen && !panel.classList.contains('panel-closed');
+
+  if (!exposureOpen) toggleExposure();
+  else {
+    panel.classList.remove('panel-closed');
+    document.getElementById('exposureWrap').classList.remove('panel-closed');
+  }
+
+  function createCharts() {
+    try {
+      renderCharts(baseRate);
+      if (window.exposureChartInst) window.exposureChartInst.resize();
+      if (window.compChartInst) window.compChartInst.resize();
+      setTimeout(() => {
+        if (window.exposureChartInst) window.exposureChartInst.resize();
+        if (window.compChartInst) window.compChartInst.resize();
+      }, 150);
+    } catch (err) {
+      console.error('Occupancy chart render failed:', err);
+    }
+  }
+
+  if (wasAlreadyOpen) createCharts();
+  else setTimeout(createCharts, 350);
+
+  updatePanelState();
+}
+
+(function initExposureResizeObservers() {
+  const expWrap = document.getElementById('exposureChartWrap');
+  const compWrap = document.getElementById('compChartWrap');
+  if (!expWrap || !compWrap) return;
+  const ro = new ResizeObserver((entries) => {
+    try {
+      for (const entry of entries) {
+        const h = entry.contentRect.height;
+        if (h < 50) continue;
+        if (entry.target === expWrap && window.exposureChartInst) window.exposureChartInst.resize();
+        if (entry.target === compWrap && window.compChartInst) window.compChartInst.resize();
+      }
+    } catch (_) { /* chart may be mid-destroy */ }
+  });
+  ro.observe(expWrap);
+  ro.observe(compWrap);
+})();
+
+function toggleExposure() {
+  const wrap = document.getElementById('exposureWrap');
+  const panel = document.getElementById('exposurePanel');
+  if (!exposureOpen) {
+    exposureOpen = true;
+    wrap.style.display = '';
+    panel.classList.remove('panel-closed');
+    wrap.classList.remove('panel-closed');
+  } else {
+    exposureOpen = false;
+    panel.classList.add('panel-closed');
+    wrap.classList.add('panel-closed');
+    setTimeout(() => { if (!exposureOpen) wrap.style.display = 'none'; }, 300);
+  }
+  updatePanelState();
+}
+
+function renderCharts(baseRate) {
+  const labels = CHART_MONTHS;
+  const n = labels.length;
+
+  const expData = (() => {
+    const phase = Math.random() * Math.PI * 2;
+    const arr = [];
+    let noise = 0;
+    for (let i = 0; i < n; i++) {
+      noise = noise * 0.75 + (Math.random() - 0.5) * 0.08;
+      const sine = Math.sin(phase + (i / 6) * Math.PI * 2) * 0.4;
+      const pressure = Math.max(0, Math.min(1, 0.5 + sine * 0.6 + noise));
+      const unsold = Math.max(0, Math.min(6, 0.8 + 4 * pressure));
+      const d30 = Math.max(0, Math.min(12, unsold + 1.5 + 3 * pressure));
+      const d60 = Math.max(2, Math.min(16, d30 + 2 + 2.5 * pressure));
+      arr.push({ vacant: +unsold.toFixed(2), exp30: +d30.toFixed(2), exp60: +d60.toFixed(2) });
+    }
+    return arr;
+  })();
+
+  const pricingSeries = Array.from({ length: n }, () => {
+    const compMedian = baseRate + 40 + Math.floor(Math.random() * 60 - 30);
+    return {
+      fizzMedian: baseRate + Math.floor(Math.random() * 50 - 25),
+      compMedian,
+      compFloor: compMedian - 120 + Math.floor(Math.random() * 30 - 15),
+      compCeiling: compMedian + 140 + Math.floor(Math.random() * 30 - 15),
+    };
+  });
+
+  const darkTooltip = {
+    mode: 'index',
+    intersect: false,
+    backgroundColor: '#1e2028',
+    borderColor: '#3d4150',
+    borderWidth: 1,
+    titleColor: '#e5e7eb',
+    bodyColor: '#9ca3af',
+    padding: 10,
+    titleFont: { family: 'Inter', size: 12, weight: '600' },
+    bodyFont: { family: 'Inter', size: 11 },
+    callbacks: {
+      label: function(ctx) {
+        const isExposure = ctx.chart.canvas.id === 'exposureChart';
+        const suffix = isExposure ? '%' : '';
+        const prefix = !isExposure ? '\u20ac' : '';
+        return ' ' + ctx.dataset.label + ': ' + prefix + ctx.parsed.y.toFixed(isExposure ? 1 : 0) + suffix;
+      }
+    }
+  };
+
+  const xTickOpts = { display: true, color: '#9ca3af', font: { family: 'Inter', size: 9 }, maxRotation: 0, maxTicksLimit: 10, autoSkip: true };
+  const yTickOpts = { color: '#9ca3af', font: { family: 'Inter', size: 9 } };
+  const gridColor = 'rgba(255,255,255,0.06)';
+
+  if (exposureChartInst) exposureChartInst.destroy();
+  exposureChartInst = new Chart(document.getElementById('exposureChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '60 Day', data: expData.map(d => d.exp60),  borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.15)', fill: true, tension: 0, pointRadius: 0 },
+        { label: '30 Day', data: expData.map(d => d.exp30),  borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', fill: true, tension: 0, pointRadius: 0 },
+        { label: 'Unsold', data: expData.map(d => d.vacant), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.25)', fill: true, tension: 0, pointRadius: 0 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { tooltip: darkTooltip, legend: { display: false } },
+      scales: {
+        x: { display: true, ticks: xTickOpts, grid: { color: gridColor } },
+        y: { display: true, min: 0, max: 16, ticks: { ...yTickOpts, callback: v => v + '%' }, grid: { color: gridColor } },
+      },
+    },
+  });
+
+  if (compChartInst) compChartInst.destroy();
+  compChartInst = new Chart(document.getElementById('compChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Comp Corridor', data: pricingSeries.map(d => d.compCeiling), borderColor: 'transparent', borderWidth: 0, pointRadius: 0, tension: 0, fill: { target: 1 }, backgroundColor: 'rgba(255,255,255,0.08)' },
+        { label: 'Comp Corridor Lower', data: pricingSeries.map(d => d.compFloor), borderColor: 'transparent', borderWidth: 0, pointRadius: 0, tension: 0, fill: false },
+        { label: 'Comp Floor', data: pricingSeries.map(d => d.compFloor), borderColor: 'rgba(148,163,184,0.5)', borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, tension: 0, fill: false },
+        { label: 'Comp Ceiling', data: pricingSeries.map(d => d.compCeiling), borderColor: 'rgba(148,163,184,0.5)', borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, tension: 0, fill: false },
+        { label: 'FIZZ Median', data: pricingSeries.map(d => d.fizzMedian), borderColor: '#e8007d', borderWidth: 2, pointRadius: 0, tension: 0, fill: false },
+        { label: 'Competitor Median', data: pricingSeries.map(d => d.compMedian), borderColor: '#f472b6', borderWidth: 2, pointRadius: 0, tension: 0, fill: false },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { tooltip: darkTooltip, legend: { display: false }, filler: { propagate: true } },
+      scales: {
+        x: { display: true, ticks: xTickOpts, grid: { color: gridColor } },
+        y: { display: true, ticks: { ...yTickOpts, callback: v => '\u20ac' + v.toLocaleString('en-GB') }, grid: { color: gridColor } },
+      },
+    },
+  });
+}
+
+// ── Unit Rate History Panel ───────────────────────────────
+function updatePanelState() {
+  const container = document.getElementById('panelsContainer');
+  container.classList.toggle('both-open', exposureOpen && unitPricingOpen);
+}
+
+function toggleUnitPricing() {
+  const wrap = document.getElementById('unitPricingWrap');
+  const panel = document.getElementById('unitPricingPanel');
+  if (unitPricingOpen) {
+    unitPricingOpen = false;
+    panel.classList.add('panel-closed');
+    wrap.classList.add('panel-closed');
+    setTimeout(() => {
+      if (!unitPricingOpen) { wrap.style.display = 'none'; }
+    }, 300);
+    if (unitPricingChartInst) { unitPricingChartInst.destroy(); unitPricingChartInst = null; }
+  } else {
+    unitPricingOpen = true;
+    wrap.style.display = '';
+    panel.classList.remove('panel-closed');
+    wrap.classList.remove('panel-closed');
+  }
+  updatePanelState();
+}
+
+function makeUnitRateHistory(baseRate) {
+  const days = 90;
+  const labels = [];
+  const listed = [];
+  const booked = [];
+
+  let currentListed = baseRate * (0.95 + Math.random() * 0.04);
+  let currentBooked = currentListed - Math.floor(Math.random() * 60);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(DEMO_TODAY);
+    d.setDate(d.getDate() - i);
+    labels.push(d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }));
+
+    currentListed += (Math.random() - 0.48) * 6;
+    currentListed = Math.max(baseRate * 0.9, Math.min(baseRate * 1.08, currentListed));
+
+    currentBooked += (Math.random() - 0.48) * 5;
+    currentBooked = Math.max(baseRate * 0.85, Math.min(currentListed, currentBooked));
+
+    listed.push(Math.round(currentListed));
+    booked.push(Math.round(currentBooked));
+  }
+
+  return { labels, listed, booked };
+}
+
+function openUnitRateHistory(unitId) {
+  const found = findUnitInPricingData(unitId);
+  const rate = found ? found.unit.rate : 1200;
+
+  if (exposureOpen) toggleExposure();
+
+  document.getElementById('unitPricingUnitId').textContent = unitId;
+
+  const wrap = document.getElementById('unitPricingWrap');
+  const panel = document.getElementById('unitPricingPanel');
+  wrap.style.display = '';
+  panel.classList.remove('panel-closed');
+  wrap.classList.remove('panel-closed');
+  unitPricingOpen = true;
+  updatePanelState();
+
+  const baseRate = rate || 1200;
+  const { labels, listed, booked } = makeUnitRateHistory(baseRate);
+
+  const overrideIndices = [];
+  const numOverrides = Math.floor(Math.random() * 3) + 2;
+  while (overrideIndices.length < numOverrides) {
+    const idx = Math.floor(Math.random() * 70) + 5;
+    if (!overrideIndices.includes(idx)) overrideIndices.push(idx);
+  }
+
+  const ptRadius = listed.map((_, i) => overrideIndices.includes(i) ? 7 : 0);
+  const ptBg = listed.map((_, i) => overrideIndices.includes(i) ? '#fbbf24' : '#e8007d');
+  const ptBorder = listed.map((_, i) => overrideIndices.includes(i) ? '#fbbf24' : 'transparent');
+
+  if (unitPricingChartInst) unitPricingChartInst.destroy();
+  unitPricingChartInst = new Chart(document.getElementById('unitPricingChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Listed Rate',
+          data: listed,
+          borderColor: '#e8007d',
+          borderWidth: 2,
+          pointRadius: ptRadius,
+          pointBackgroundColor: ptBg,
+          pointBorderColor: ptBorder,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: 'Avg Booked Rate',
+          data: booked,
+          borderColor: '#60a5fa',
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: '#1e2028',
+          borderColor: '#3d4150',
+          borderWidth: 1,
+          titleColor: '#e5e7eb',
+          bodyColor: '#9ca3af',
+          padding: 10,
+          titleFont: { family: 'Inter', size: 12, weight: '600' },
+          bodyFont: { family: 'Inter', size: 11 },
+          callbacks: {
+            label: function(ctx) {
+              const isOverride = ctx.datasetIndex === 0 && overrideIndices.includes(ctx.dataIndex);
+              let line = ' ' + ctx.dataset.label + ': \u20ac' + ctx.parsed.y.toLocaleString('en-GB');
+              if (isOverride) line += '  \u26a1 Override';
+              return line;
+            }
+          }
+        },
+      },
+      scales: {
+        x: { display: true, ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, maxTicksLimit: 10, maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(255,255,255,0.06)' } },
+        y: { display: true, ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, callback: v => '\u20ac' + v.toLocaleString('en-GB') }, grid: { color: 'rgba(255,255,255,0.06)' } },
+      },
+    },
+  });
+}
+
+// ── Note Modal ───────────────────────────────────────────
+let noteModalId = null;
+let noteExpiryDate = null;
+
+function openNoteModal(id, existingNote) {
+  noteModalId = id;
+  document.getElementById('noteModalUnit').textContent = id;
+  const ta = document.getElementById('noteTextarea');
+  if (existingNote) {
+    ta.value = existingNote.text;
+    noteExpiryDate = existingNote.expires;
+    document.getElementById('noteExpiryLabel').textContent = existingNote.expires;
+  } else {
+    ta.value = '';
+    noteExpiryDate = null;
+    document.getElementById('noteExpiryLabel').textContent = 'Select date';
+  }
+  openModal('noteModal');
+}
+
+function saveNote() {
+  const text = document.getElementById('noteTextarea').value.trim();
+  const noteObj = text ? { text, expires: noteExpiryDate || '' } : null;
+
+  for (const house of PRICING_DATA) {
+    for (const rt of house.roomTypes) {
+      const rtKey = house.id + rt.type;
+      if (rtKey === noteModalId) { rt.note = noteObj; break; }
+      for (const unit of rt.units) {
+        if (unit.id === noteModalId) { unit.note = noteObj; break; }
+      }
+    }
+  }
+  closeModal('noteModal');
+  renderTable();
+}
+
+// ── Calendar Date Picker ──────────────────────────────────
+let calTarget = null;
+let calAnchor = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+function openCalendar(target, btnEl) {
+  calTarget = target;
+  calAnchor = btnEl;
+  const cal = document.getElementById('calendarModal');
+  const rect = btnEl.getBoundingClientRect();
+  cal.style.left = rect.left + 'px';
+  cal.style.top = (rect.bottom + 6) + 'px';
+  renderCalendar();
+  cal.classList.add('open');
+}
+
+function closeCalendar() {
+  document.getElementById('calendarModal').classList.remove('open');
+  calTarget = null;
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthLabel').textContent = monthNames[calMonth] + ' ' + calYear;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + today.getMonth() + '-' + today.getDate();
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) {
+    html += '<button class="empty"></button>';
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = calYear + '-' + calMonth + '-' + d;
+    const isToday = dateStr === todayStr;
+    const cls = (isToday ? ' today' : '');
+    html += `<button class="${cls}" onclick="selectCalDay(${d})">${d}</button>`;
+  }
+  document.getElementById('calDays').innerHTML = html;
+}
+
+function selectCalDay(day) {
+  const mm = String(calMonth + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  const yy = String(calYear).slice(-2);
+  const usDate = mm + '/' + dd + '/' + yy;
+
+  if (calTarget === 'noteExpiry') {
+    noteExpiryDate = usDate;
+    document.getElementById('noteExpiryLabel').textContent = usDate;
+  }
+  closeCalendar();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.calendar-popup') && !e.target.closest('.date-picker-btn')) {
+    closeCalendar();
+  }
+});
+
+// ── Advanced Drawer ───────────────────────────────────────
+function toggleAdvDrawer() {
+  advDrawerOpen = !advDrawerOpen;
+  document.getElementById('advDrawer').classList.toggle('open', advDrawerOpen);
+}
+
+// ── Unit Lock modal ───────────────────────────────────────
+let _lockModalUnitId = null;
+let _lockMode = 'indef';
+let _lockDatePicker = null;
+
+function _setLockMode(mode) {
+  _lockMode = mode;
+  const paint = (btnId, on) => {
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    b.style.background = on ? 'var(--accent)' : 'var(--surface)';
+    b.style.color      = on ? '#fff'          : 'var(--text-secondary)';
+    b.style.fontWeight = on ? '600'           : '400';
+  };
+  paint('lockMode_indef', mode === 'indef');
+  paint('lockMode_date',  mode === 'date');
+  const row = document.getElementById('lockDateRow');
+  if (row) row.style.display = mode === 'date' ? 'block' : 'none';
+}
+
+function _initLockDatePicker(initial) {
+  if (_lockDatePicker && _lockDatePicker.picker) _lockDatePicker.picker.remove();
+  const trig = document.getElementById('lockDateTrigger');
+  const lbl  = document.getElementById('lockDateLabel');
+  if (!trig) { _lockDatePicker = null; return; }
+  _lockDatePicker = new SingleDatePicker({
+    trigger: trig, labelEl: lbl, placeholder: 'Select date',
+  });
+  if (initial instanceof Date) _lockDatePicker.setDate(initial);
+}
+
+function openLockModal(unitId) {
+  const found = findUnitInPricingData(unitId);
+  if (!found) return;
+  _lockModalUnitId = unitId;
+  const u = found.unit;
+  const lock = u.lock;
+
+  document.getElementById('lockModalTitle').textContent = lock?.locked ? 'Edit Lock' : 'Lock Unit Rate';
+  document.getElementById('lockModalUnit').textContent = unitId;
+  document.getElementById('lockReason').value = lock?.reason ?? '';
+  document.getElementById('lockRemoveBtn').style.display = lock?.locked ? 'inline-flex' : 'none';
+
+  if (lock?.locked && lock.lockUntil) {
+    _setLockMode('date');
+    _initLockDatePicker(new Date(lock.lockUntil));
+  } else {
+    _setLockMode('indef');
+    _initLockDatePicker(new Date(Date.now() + 30 * 864e5));
+  }
+  openModal('lockModal');
+}
+
+function saveLockFromModal() {
+  if (!_lockModalUnitId) return;
+  const reason = document.getElementById('lockReason').value.trim() || null;
+  let untilDate = null;
+  if (_lockMode === 'date') {
+    untilDate = _lockDatePicker?.getDate() ?? null;
+    if (!untilDate) { alert('Please pick a lock end date, or choose Indefinite.'); return; }
+    if (untilDate.getTime() <= Date.now()) { alert('Lock end date must be in the future.'); return; }
+  }
+  applyUnitLock(_lockModalUnitId, untilDate, reason);
+  closeModal('lockModal');
+  renderTable();
+}
+
+function removeLockFromModal() {
+  if (!_lockModalUnitId) return;
+  clearUnitLock(_lockModalUnitId);
+  closeModal('lockModal');
+  renderTable();
+}
+
+// ── Re-run Pricing ────────────────────────────────────────
+let _lastRunAt = null;
+
+function _formatLastRun(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const h12 = d.getHours() % 12 || 12;
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+  const time = `${h12}:${mm} ${ampm}`;
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return `Last updated: ${time} today`;
+  const monthShort = d.toLocaleString('en-GB', { month: 'short' });
+  return `Last updated: ${monthShort} ${d.getDate()}, ${time}`;
+}
+
+function _setLastRunLabel() {
+  const el = document.getElementById('rerunTimestamp');
+  if (el) el.textContent = _formatLastRun(_lastRunAt);
+}
+
+(function _seedLastRun() {
+  const d = new Date();
+  d.setHours(8, 0, 0, 0);
+  _lastRunAt = d.toISOString();
+})();
+
+function _pickMovementPct() {
+  const r = Math.random();
+  const mag = r < 0.6 ? 1 : r < 0.9 ? 2 : 3;
+  const sign = Math.random() < 0.5 ? -1 : 1;
+  return sign * mag;
+}
+function _roundTo5(n) { return Math.round(n / 5) * 5; }
+
+function rerunPricing() {
+  const btn = document.getElementById('rerunBtn');
+  const icon = document.getElementById('rerunBtnIcon');
+  const label = document.getElementById('rerunBtnLabel');
+  if (!btn || btn.disabled) return;
+
+  btn.disabled = true;
+  if (icon) icon.innerHTML = '<span class="rerun-spinner"></span>';
+  if (label) label.textContent = 'Recomputing\u2026';
+
+  setTimeout(() => {
+    if (typeof expireStaleUnitLocks === 'function') expireStaleUnitLocks();
+
+    let changedCount = 0;
+    PRICING_DATA.forEach(c => c.roomTypes.forEach(rt => rt.units.forEach(u => {
+      if (u.lock && u.lock.locked) return;
+      if (Math.random() < 0.30) return;
+      const pct = _pickMovementPct();
+      const moved = _roundTo5(u.rec * (1 + pct / 100));
+      if (moved !== u.rec) {
+        u.rec = moved;
+        u.pctChange = Math.round(((u.rec - u.rate) / u.rate) * 1000) / 10;
+        changedCount++;
+      }
+    })));
+
+    _lastRunAt = new Date().toISOString();
+    _setLastRunLabel();
+
+    btn.disabled = false;
+    if (icon) icon.innerHTML = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v3h-3"/><path d="M12 6a5 5 0 1 0-1.5 3.5"/></svg>';
+    if (label) label.textContent = 'Re-run pricing';
+
+    renderTable();
+    showToast('Pricing updated. ' + changedCount + ' unit' + (changedCount === 1 ? '' : 's') + ' changed.');
+  }, 1500);
+}
+
+// ── Init ──────────────────────────────────────────────────
+if (typeof expireStaleUnitLocks === 'function') expireStaleUnitLocks();
+_setLastRunLabel();
+populateFilters();
+renderTable();
+</script>
+
+<!-- ── Row-level RM Copilot panel ── -->
+<aside class="cprp" id="rowCopilotPanel" aria-hidden="true">
+  <button id="rowCopilotCloseBtn" style="position:absolute;top:12px;right:12px;z-index:30;background:#2a2e38;border:1px solid #4b5563;color:#fff;font-size:20px;font-weight:bold;cursor:pointer;padding:4px 8px;line-height:1;border-radius:50%;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;">&times;</button>
+  <div class="cprp-head" id="rowCopilotHead"></div>
+  <div class="cprp-chat" id="rowCopilotChat"></div>
+  <div class="cprp-suggest" id="rowCopilotSuggest"></div>
+  <div class="cprp-input-wrap">
+    <input type="text" class="cp-input" id="rowCopilotInput" placeholder="Ask a question about this unit..." onkeydown="if(event.key==='Enter'){rowCopilotSend();}"/>
+    <button type="button" class="cp-send" onclick="rowCopilotSend()" aria-label="Send">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+    </button>
+  </div>
+</aside>
+
+<style>
+  /* ── Copilot Panel ── */
+  .cprp {
+    position:fixed;top:0;right:0;width:380px;height:100vh;
+    background:linear-gradient(180deg,#1a1d23 0%,#1e2128 100%);
+    border-left:1px solid #2a2d35;z-index:200;
+    display:none;flex-direction:column;
+    transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+    box-shadow:-8px 0 32px rgba(0,0,0,.35);
+    font-family:'Inter',sans-serif;
+  }
+  .cprp.open { display:flex;transform:translateX(0); }
+  .cprp-head { padding:16px 16px 12px;border-bottom:1px solid #2a2d35;flex-shrink:0; }
+  .cprp-dest { font-size:15px;font-weight:700;color:#fff;margin-bottom:2px; }
+  .cprp-wk { font-size:12px;color:#9ca3af;margin-bottom:6px; }
+  .cprp-metrics { font-size:12px;color:#d1d5db;line-height:1.6; }
+  .cprp-sep { color:#4b5563;margin:0 4px; }
+  .cprp-label-bar { margin-top:8px;padding-top:8px;border-top:1px solid #2a2d35; }
+  .cprp-label { font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.04em; }
+  .cprp-chat { flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px; }
+  .cprp-suggest { padding:8px 16px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid #2a2d35; }
+  .cprp-input-wrap { display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid #2a2d35;flex-shrink:0; }
+  .cp-input {
+    flex:1;background:#23262f;border:1px solid #3d4150;border-radius:6px;
+    padding:8px 12px;color:#e5e7eb;font-size:12.5px;font-family:'Inter',sans-serif;outline:none;
+  }
+  .cp-input::placeholder { color:#6b7280; }
+  .cp-input:focus { border-color:var(--accent); }
+  .cp-send {
+    background:var(--accent);border:none;border-radius:6px;width:34px;height:34px;
+    display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;
+    transition:background .15s;
+  }
+  .cp-send:hover { background:var(--accent-dim); }
+  .cp-msg {
+    max-width:88%;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.55;
+    white-space:pre-line;word-wrap:break-word;
+  }
+  .cp-asst { background:#23262f;color:#d1d5db;align-self:flex-start;border-bottom-left-radius:2px; }
+  .cp-user { background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:2px; }
+  .cp-typing { display:flex;gap:4px;padding:8px 12px;align-self:flex-start; }
+  .cp-typing span {
+    width:6px;height:6px;border-radius:50%;background:#6b7280;
+    animation:cpBounce .6s infinite alternate;
+  }
+  .cp-typing span:nth-child(2) { animation-delay:.15s; }
+  .cp-typing span:nth-child(3) { animation-delay:.3s; }
+  @keyframes cpBounce { to { opacity:.3;transform:translateY(-4px); } }
+  .cp-pill {
+    background:#23262f;border:1px solid #3d4150;color:#d1d5db;
+    font-size:11.5px;font-family:'Inter',sans-serif;padding:5px 10px;border-radius:14px;
+    cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s;
+  }
+  .cp-pill:hover { border-color:var(--accent);color:#fff; }
+</style>
+
+<script>
+// ── Row Copilot ─────────────────────────────────────────────
+let _rowCopilotCtx = null;
+
+function openRowCopilot(unitId, houseId, roomType) {
+  const house = PRICING_DATA.find(c => c.id === houseId);
+  const rt = house?.roomTypes.find(b => b.type === roomType);
+  if (!rt) return;
+  const unit = unitId ? rt.units?.find(u => u.id === unitId) : null;
+  if (unitId && !unit) return;
+
+  _rowCopilotCtx = { unitId, houseId, roomType, unit, house, rt };
+
+  document.getElementById('rowCopilotChat').innerHTML = '';
+
+  if (unitId && unit) {
+    document.getElementById('rowCopilotHead').innerHTML = `
+      <div class="cprp-dest">${unitId}</div>
+      <div class="cprp-wk">${house.name} \u00b7 ${roomType}</div>
+      <div class="cprp-metrics">
+        Rate: ${fmt(scaleMoveIn(unit.rate))}
+        <span class="cprp-sep">\u00b7</span>
+        Rec: ${fmt(scaleMoveIn(effectiveRec(unit)))}
+        <span class="cprp-sep">\u00b7</span>
+        ${roomType} pace: ${(rt.ros > 0 ? '+' : '') + rt.ros}%
+      </div>
+      <div class="cprp-label-bar">
+        <span class="cprp-label">\u2726 RM Copilot</span>
+      </div>
+    `;
+  } else {
+    const units = rt.units ?? [];
+    const avgRate = units.length > 0 ? Math.round(units.reduce((s, u) => s + (u.rate ?? 0), 0) / units.length) : 0;
+    document.getElementById('rowCopilotHead').innerHTML = `
+      <div class="cprp-dest">${roomType}</div>
+      <div class="cprp-wk">${house.name}</div>
+      <div class="cprp-metrics">
+        ${units.length} units, ${rt.sold}/${rt.fcst} beds sold
+        <span class="cprp-sep">\u00b7</span>
+        Avg Rate: ${fmt(scaleMoveIn(avgRate))}
+        <span class="cprp-sep">\u00b7</span>
+        Pace: ${(rt.ros > 0 ? '+' : '') + rt.ros}%
+      </div>
+      <div class="cprp-label-bar">
+        <span class="cprp-label">\u2726 RM Copilot</span>
+      </div>
+    `;
+  }
+
+  const panel = document.getElementById('rowCopilotPanel');
+  panel.style.display = '';
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  renderRowCopilotSuggest();
+
+  rowCopilotShowTyping();
+  setTimeout(() => {
+    rowCopilotHideTyping();
+    rowCopilotPush('asst', buildUnitContextMessage());
+  }, 400);
+}
+
+function buildUnitContextMessage() {
+  const ctx = _rowCopilotCtx;
+  if (!ctx) return '';
+  const { unit, unitId, house, roomType, rt } = ctx;
+
+  if (!unitId) {
+    const units = rt?.units ?? [];
+    const avgRate = units.length > 0
+      ? Math.round(units.reduce((s, u) => s + (u.rate ?? 0), 0) / units.length)
+      : 0;
+    return `Room type overview for ${roomType} at ${house.name}:\n`
+      + `- ${rt.sold} of ${rt.fcst} forecast beds sold (${rt.fcst ? Math.round(rt.sold / rt.fcst * 100) : 0}%)\n`
+      + `- Booking pace: ${rt.ros > 0 ? '+' : ''}${rt.ros}% vs last year\n`
+      + `- Avg rate (${moveInById(currentMoveIn).short}): ${fmt(scaleMoveIn(avgRate))}\n`
+      + `- Demand: ${demandLevelForScore(rt.demand).code} \u2014 ${demandLevelForScore(rt.demand).label}\n`
+      + `What would you like to explore?`;
+  }
+
+  const dl = demandLevelForScore(rt.demand);
+  return `Here's the current position for ${unitId}:\n`
+    + `- Rate: ${fmt(scaleMoveIn(unit.rate))} | Rec: ${fmt(scaleMoveIn(effectiveRec(unit)))} (${unit.pctChange > 0 ? '+' : ''}${unit.pctChange}%)\n`
+    + `- ${roomType} cluster: ${rt.sold} of ${rt.fcst} forecast beds sold | Pace ${rt.ros > 0 ? '+' : ''}${rt.ros}% vs LY\n`
+    + `- ${roomType} demand: ${dl.code} \u2014 ${dl.label}\n`
+    + `- Projected occupancy at move-in (${roomType}): ${rt.projOcc}%\n`
+    + `What would you like to explore?`;
+}
+
+function renderRowCopilotSuggest() {
+  const ctx = _rowCopilotCtx;
+  if (!ctx) return;
+  const { unit, unitId } = ctx;
+  const qs = [];
+  if (!unitId) {
+    qs.push('Which units should I reprice first?');
+    qs.push('How is the booking pace trending?');
+    qs.push('Singles vs doubles \u2014 which is selling faster?');
+    qs.push('Should I open more semester stays?');
+  } else {
+    const rt = ctx.rt;
+    if ((rt?.ros ?? 0) < -10) qs.push('Why is this room type pacing behind?');
+    if ((rt?.projOcc ?? 0) > 95) qs.push('Should I push the rate given high occupancy?');
+    qs.push('What stay type mix should I expect?');
+    qs.push('Should October be priced higher?');
+    qs.push('How does this compare to similar units?');
+  }
+  const uniq = [...new Set(qs)].slice(0, 4);
+  document.getElementById('rowCopilotSuggest').innerHTML = uniq.map(q =>
+    `<button type="button" class="cp-pill" onclick="rowCopilotAskSuggest('${q.replace(/'/g, "\\'")}')">${q}</button>`
+  ).join('');
+}
+
+function rowCopilotPush(role, text) {
+  const chat = document.getElementById('rowCopilotChat');
+  const div = document.createElement('div');
+  div.className = 'cp-msg ' + (role === 'asst' ? 'cp-asst' : 'cp-user');
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+function rowCopilotShowTyping() {
+  const chat = document.getElementById('rowCopilotChat');
+  const div = document.createElement('div');
+  div.className = 'cp-typing'; div.id = 'rowCpTyping';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+function rowCopilotHideTyping() {
+  const t = document.getElementById('rowCpTyping');
+  if (t) t.remove();
+}
+function rowCopilotSend() {
+  const input = document.getElementById('rowCopilotInput');
+  const q = (input.value || '').trim();
+  if (!q) return;
+  input.value = '';
+  rowCopilotPush('user', q);
+  rowCopilotShowTyping();
+  setTimeout(() => { rowCopilotHideTyping(); rowCopilotPush('asst', _unitAnswer(q)); }, 700);
+}
+function rowCopilotAskSuggest(q) {
+  document.getElementById('rowCopilotInput').value = q;
+  rowCopilotSend();
+}
+function closeRowCopilot() {
+  const panel = document.getElementById('rowCopilotPanel');
+  panel.classList.remove('open');
+  panel.style.display = 'none';
+  panel.setAttribute('aria-hidden', 'true');
+  _rowCopilotCtx = null;
+}
+
+function _unitAnswer(q) {
+  const ctx = _rowCopilotCtx;
+  if (!ctx) return 'Open a unit row to get specific analysis.';
+  const { unit, house, roomType, unitId, rt } = ctx;
+  const ql = q.toLowerCase();
+
+  if (!unitId) {
+    const units = rt?.units ?? [];
+    if (/(reprice|priority|which unit|first|focus)/.test(ql)) {
+      const ranked = [...units].sort((a, b) => Math.abs(b.pctChange) - Math.abs(a.pctChange)).slice(0, 3);
+      return `Top ${roomType} units to review at ${house.name}:\n` + ranked.map(u =>
+        `\u2022 ${u.id}: rec ${u.pctChange > 0 ? '+' : ''}${u.pctChange}% (${recActionFor(u)}), pace ${u.ros > 0 ? '+' : ''}${u.ros}%`
+      ).join('\n') + `\n\nStart with the largest recommended moves \u2014 they carry the most revenue impact.`;
+    }
+    if (/(pace|trend)/.test(ql)) {
+      return `${roomType} at ${house.name} is pacing ${rt.ros > 0 ? '+' : ''}${rt.ros}% vs last year, with ${rt.sold} of ${rt.fcst} forecast beds sold.\n\n${rt.ros < -10 ? 'The gap opened after the March admission wave \u2014 consider a targeted rate trim or opening more semester-stay inventory.' : rt.ros > 10 ? 'Bookings are running ahead of last year \u2014 the engine is recommending rate increases to protect late-season yield.' : 'Pace is broadly in line with last year. Hold current strategy and review weekly.'}`;
+    }
+    if (/(single|double|faster|mix)/.test(ql)) {
+      const other = house.roomTypes.find(b => b.type !== roomType);
+      return `At ${house.name}:\n\u2022 ${rt.type}: pace ${rt.ros > 0 ? '+' : ''}${rt.ros}%, ${rt.sold}/${rt.fcst} sold\n` +
+        (other ? `\u2022 ${other.type}: pace ${other.ros > 0 ? '+' : ''}${other.ros}%, ${other.sold}/${other.fcst} sold\n\n${rt.ros > other.ros ? rt.type : other.type} is selling faster this season.` : '');
+    }
+    if (/(semester|open more|stay)/.test(ql)) {
+      return `Semester stays carry a +12% premium (+20% for Plug&Play) but shorten the tenancy to 6 months. With ${roomType} pacing at ${rt.ros > 0 ? '+' : ''}${rt.ros}%, ${rt.ros < -8 ? 'opening more semester inventory is a good lever \u2014 it widens the funnel without cutting the Full Year rate.' : 'keep semester allocation limited \u2014 Full Year demand is strong enough to fill at the base rate.'}\n\nManage allocations on the Stay Types page.`;
+    }
+    return `I can help with ${roomType} analysis at ${house.name}. Try asking about repricing priorities, booking pace, the singles/doubles mix, or stay-type allocation.`;
+  }
+
+  const dl = demandLevelForScore(rt.demand);
+
+  if (/(pacing|behind|why.*slow|slow)/.test(ql)) {
+    return `The ${roomType} cluster at ${house.name} is pacing ${rt.ros > 0 ? '+' : ''}${rt.ros}% vs last year with ${rt.sold} of ${rt.fcst} forecast beds sold.\n\n${rt.ros < -15 ? 'This triggered the Low Pace alert. The engine recommends ' + (unit.rec < unit.rate ? fmt(scaleMoveIn(unit.rec)) + ' for ' + unitId + ' (a trim from ' + fmt(scaleMoveIn(unit.rate)) + ') to reaccelerate bookings before the season closes.' : 'holding this unit\u2019s rate for now.') : 'The cluster is within a normal pace band \u2014 continue monitoring weekly.'}`;
+  }
+
+  if (/(sell.?out|push.*rate|risk|occupancy)/.test(ql)) {
+    return `Projected occupancy at move-in for ${roomType}s is ${rt.projOcc}%.\n\n${rt.projOcc > 95 ? 'With occupancy this high, the remaining beds are scarce inventory. The engine recommends ' + fmt(scaleMoveIn(unit.rec)) + ' (' + (unit.pctChange > 0 ? '+' : '') + unit.pctChange + '%). Accepting the increase protects yield on the last units without materially slowing conversion.' : 'Occupancy risk is moderate \u2014 balance rate increases against the remaining booking window.'}`;
+  }
+
+  if (/(stay type|mix)/.test(ql)) {
+    return `Typical mix for ${roomType} in ${house.city}: ~60% Full Year, ~15% Full Year Plug&Play, ~15% Semester, ~10% Long Term.\n\nPlug&Play uptake skews to international first-years \u2014 expect higher share in September intakes. Semester stays fill later in the season (Nov\u2013Jan for the spring semester).`;
+  }
+
+  if (/(october|oct|hold)/.test(ql)) {
+    return `Yes \u2014 October move-in carries a +5% hold-time premium (currently ${fmt(priceFor(unit.rate, 'full_year', 'oct1'))} vs ${fmt(priceFor(unit.rate, 'full_year', 'sep1'))} for Sep 1).\n\nThe room sits empty through September, so the premium recovers the lost month across the tenancy. If October demand weakens, narrow the premium before discounting the September base.`;
+  }
+
+  if (/(similar|compare|comparable|benchmark)/.test(ql)) {
+    const units = rt?.units ?? [];
+    const avgRate = units.length > 0 ? Math.round(units.reduce((s, u) => s + (u.rate ?? 0), 0) / units.length) : 0;
+    const delta = (unit.rate ?? 0) - avgRate;
+    const pos = delta > 0 ? `\u20ac${delta} above` : delta < 0 ? `\u20ac${Math.abs(delta)} below` : 'at';
+    return `Compared to other ${roomType}s at ${house.name}:\n\nThis unit's rate (${fmt(scaleMoveIn(unit.rate))}) is ${pos} the room-type average (${fmt(scaleMoveIn(avgRate))}). Cluster demand is ${dl.code} \u2014 ${dl.label.toLowerCase()}.`;
+  }
+
+  return `I can help analyse ${unitId} in more detail. Try asking about booking pace, sell-out risk, stay-type mix, October pricing, or how it compares to similar units.`;
+}
+
+document.getElementById('rowCopilotCloseBtn').addEventListener('click', e => { e.stopPropagation(); closeRowCopilot(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const rp = document.getElementById('rowCopilotPanel');
+  if (rp?.classList.contains('open')) closeRowCopilot();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concession Management — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <script src="date-picker.js"></script>
+  <style>
+    /* Concession form — date-picker trigger styled to match the other
+       inputs in the form. Borrowed from .hist-date-trigger on history.html. */
+    .conc-date-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--text-primary);
+      background: var(--surface);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .12s;
+    }
+    .conc-date-trigger:hover { border-color: var(--accent); }
+    .conc-date-trigger.is-placeholder { color: var(--text-muted); }
+    .conc-date-trigger svg { color: var(--text-muted); flex-shrink: 0; }
+    /* Lease-term pills for the concession form. Selected = pink fill; idle = neutral. */
+    .conc-term-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border-mid);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 500;
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      transition: all .12s;
+    }
+    .conc-term-pill input { margin: 0; accent-color: #fff; }
+    .conc-term-pill:hover { border-color: var(--accent); }
+    .conc-term-pill.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    /* Conditional input under each radio option */
+    .conc-radio-input {
+      display: none;
+      margin-top: 8px;
+      margin-left: 26px;
+      align-items: center;
+      gap: 8px;
+    }
+    .conc-radio-input.open { display: flex; }
+    .conc-radio-input input[type="number"] {
+      width: 120px;
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+    <div class="nav-tabs"><a href="pricing.html" class="nav-tab">Pricing</a><a href="expiration.html" class="nav-tab">Expiration Management</a><a href="term.html" class="nav-tab">Term Management</a><a href="concessions.html" class="nav-tab active">Concession Management</a><a href="rent-control.html" class="nav-tab">Rent Control</a></div>
+    <div class="nav-divider"></div>
+    <div style="position:relative;"><button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button><div class="nav-dropdown" id="navDropdown"><a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a><a href="history.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 11,10"/></svg>Lease History</a><div style="height:1px;background:var(--border);margin:4px 0;"></div><a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a></div></div>
+  </nav>
+  <div class="filter-bar" id="filterBar"></div>
+  <div class="subtab-bar">
+    <a href="#" class="subtab active" id="tab-overview" onclick="switchTab('overview');return false;">Overview</a>
+    <a href="#" class="subtab" id="tab-management" onclick="switchTab('management');return false;">Management</a>
+    <div class="subtab-spacer"></div>
+  </div>
+  <div id="kpiCards" style="display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;overflow-x:auto;"></div>
+  <div class="main">
+    <div class="table-wrap" id="tableWrap"><div id="mainContent"></div></div>
+    <div id="mgmtContainer" style="display:none;flex:1;overflow:hidden;"></div>
+    <!-- Unit Concession Side Panel -->
+    <div class="adv-drawer" id="unitConcPanel" style="width:320px;">
+      <div class="adv-drawer-header"><span class="adv-drawer-title" id="unitConcPanelTitle">Concessions</span><button class="adv-close" onclick="closeUnitConcPanel()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg></button></div>
+      <div style="padding:14px 18px;flex:1;overflow-y:auto;" id="unitConcActiveList"></div>
+      <div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--body-bg);">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Net Effective Rent</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent);" id="unitNetEffPreview">&mdash;</div>
+        <div style="font-size:11px;color:var(--text-muted);" id="unitConcBreakdown"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Concession Info Modal -->
+<div class="modal-backdrop" id="concInfoModal">
+  <div class="modal" style="width:min(95vw,860px);max-width:min(95vw,860px);max-height:85vh;">
+    <div class="modal-header"><div><div class="modal-title">Active Concessions</div><div class="modal-subtitle" id="concInfoSubtitle"></div></div><button class="modal-close" onclick="closeModal('concInfoModal')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg></button></div>
+    <div class="modal-body" style="overflow-y:auto;">
+      <div id="concInfoEmpty" style="display:none;padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No active concessions</div>
+      <table class="modal-table" id="concInfoTable"><thead><tr><th>Level</th><th>Type</th><th>Amount</th><th style="text-align:center;">% Rent</th><th>Lease</th><th>Valid</th><th>Status</th><th style="text-align:center;">Stack</th><th style="text-align:center;cursor:help;" title="Priority order for stacking. Lower number = higher priority. If a concession is non-stackable, it overrides all lower priority concessions.">Priority</th></tr></thead><tbody id="concInfoBody"></tbody></table>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:8px;border-top:2px solid var(--border);"><div><span style="font-size:12px;color:var(--text-muted);">Total stacked:</span><span style="font-size:16px;font-weight:700;color:var(--accent);margin-left:8px;" id="concInfoTotal"></span><span style="font-size:12px;color:var(--text-muted);margin-left:6px;" id="concInfoTotalPct"></span></div><div><span style="font-size:12px;color:var(--text-muted);">Net Eff. Rent:</span><span style="font-size:16px;font-weight:700;color:var(--text-primary);margin-left:8px;" id="concInfoNetEff"></span></div></div>
+    </div>
+    <div class="modal-footer"><div style="display:flex;justify-content:space-between;align-items:center;width:100%;"><a id="concInfoManageLink" href="concessions.html?tab=management" style="display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:13px;font-weight:500;text-decoration:none;">Manage in Concession Manager<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="7" x2="12" y2="7"/><polyline points="8,3 12,7 8,11"/></svg></a><button class="btn btn-ghost" onclick="closeModal('concInfoModal')">Close</button></div></div>
+  </div>
+</div>
+
+<!-- Competitor Concession Detail Modal -->
+<div class="modal-backdrop" id="compConcDetailModal">
+  <div class="modal" style="width:560px;">
+    <div class="modal-header"><div><div class="modal-title" id="compDetailTitle"></div><div class="modal-subtitle" id="compDetailSub"></div></div>
+      <button class="modal-close" onclick="closeModal('compConcDetailModal')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg></button>
+    </div>
+    <div class="modal-body" id="compDetailBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('compConcDetailModal')">Close</button></div>
+  </div>
+</div>
+
+<script>
+let expandedConcProps=new Set();let expandedConcBedTypes={};let currentTab='overview';let unitConcPanelOpen=false;
+let selectedMgmtCommId=null;let selectedMgmtBedType=null;let selectedMgmtUnitId=null;let expandedMgmtComms=new Set();let expandedMgmtBedTypes=new Set();let editingConcessionId=null;
+let selectedLeaseType=2;let selectedAutoLeaseType=2;
+function getUrlParams(){const p=new URLSearchParams(window.location.search);return{tab:p.get('tab'),commId:p.get('commId'),bedType:p.get('bedType'),unitId:p.get('unitId')};}
+
+// Display helpers for the new concession shape. Every concession renders
+// with a short type tag and an amount string that respects its valueType.
+function _concTypeLabel(c) {
+  if (c.valueType === 'flat_monthly')     return 'Flat monthly';
+  if (c.valueType === 'total_dollar')     return 'Total $';
+  if (c.valueType === 'pct_monthly_rent') return '% of rent';
+  return '—';
+}
+function _concAmountLabel(c) {
+  const mo = c.displayAmount ?? 0;
+  if (c.valueType === 'flat_monthly')     return '$' + (c.value ?? 0) + '/mo';
+  if (c.valueType === 'total_dollar')     return '$' + (c.value ?? 0).toLocaleString() + ' total (≈$' + mo + '/mo)';
+  if (c.valueType === 'pct_monthly_rent') return (c.value ?? 0) + '% of rent (≈$' + mo + '/mo)';
+  return '$' + mo;
+}
+function _concApplyToLabel(c) {
+  return c.applyTo === 'gross' ? 'Gross' : 'Net Eff.';
+}
+
+function toggleMenu(){document.getElementById('navDropdown').classList.toggle('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.nav-menu-btn')&&!e.target.closest('.nav-dropdown'))document.getElementById('navDropdown').classList.remove('open');});
+
+// Filters
+function buildMultiSelect(c){const w=document.createElement('div');w.className='ms-wrap';w.id='ms-'+c.id;w.innerHTML=`<button class="ms-trigger" onclick="toggleMs('${c.id}')"><span class="ms-label">${c.defaultLabel}</span><svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg></button><div class="ms-dropdown"><div class="ms-search"><input type="text" placeholder="Search..." oninput="filterMsOptions('${c.id}',this.value)"></div><div class="ms-options"><label class="ms-option ms-all"><input type="checkbox" value="__all__" checked onchange="toggleMsAll('${c.id}',this)"> All</label>${c.items.map(i=>`<label class="ms-option"><input type="checkbox" value="${i}" onchange="onMsChange('${c.id}')"> ${i}</label>`).join('')}</div></div>`;return w;}
+function toggleMs(id){document.querySelectorAll('.ms-wrap').forEach(w=>{if(w.id!=='ms-'+id)w.classList.remove('open');});document.getElementById('ms-'+id).classList.toggle('open');}
+function filterMsOptions(id,q){const lo=q.toLowerCase();document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all)').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(lo)?'':'none';});}
+function toggleMsAll(id,cb){document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all) input').forEach(c=>c.checked=false);cb.checked=true;onMsChange(id);saveFilterState();updateClearBtn();}
+function onMsChange(id){const w=document.getElementById('ms-'+id);const ac=w.querySelector('.ms-all input');if(![...w.querySelectorAll('.ms-option:not(.ms-all) input')].some(c=>c.checked))ac.checked=true;else ac.checked=false;updateMsLabel(id);saveFilterState();updateClearBtn();renderConcessionsPage();}
+function getMsValues(id){const w=document.getElementById('ms-'+id);if(w.querySelector('.ms-all input').checked)return[];return[...w.querySelectorAll('.ms-option:not(.ms-all) input:checked')].map(c=>c.value);}
+function updateMsLabel(id){const w=document.getElementById('ms-'+id);const l=w.querySelector('.ms-label');const d=w.querySelector('.ms-trigger').dataset.default;const v=getMsValues(id);if(!v.length)l.textContent=d;else if(v.length<=2)l.textContent=v.join(', ');else l.textContent=v.length+' '+d.replace('All ','');}
+function saveFilterState(){const s={};['state','metro','community','rm','cd'].forEach(id=>{s[id]=getMsValues(id);});localStorage.setItem('smartrents_filters',JSON.stringify(s));}
+function restoreFilterState(){try{const saved=localStorage.getItem('smartrents_filters');if(!saved)return;const st=JSON.parse(saved);['state','metro','community','rm','cd'].forEach(fid=>{const vals=st[fid];if(!vals||!vals.length)return;const wrap=document.getElementById('ms-'+fid);if(!wrap)return;wrap.querySelectorAll('.ms-options input[type="checkbox"]').forEach(cb=>{if(cb.value==='__all__')return;cb.checked=vals.includes(cb.value);});const allCb=wrap.querySelector('input[value="__all__"]');if(allCb)allCb.checked=false;updateMsLabel(fid);});}catch(e){}}
+function clearAllFilters(){['state','metro','community','rm','cd'].forEach(fid=>{const wrap=document.getElementById('ms-'+fid);if(!wrap)return;wrap.querySelectorAll('.ms-options input').forEach(cb=>cb.checked=false);const allCb=wrap.querySelector('input[value="__all__"]');if(allCb)allCb.checked=true;updateMsLabel(fid);});localStorage.removeItem('smartrents_filters');const btn=document.getElementById('clearFiltersBtn');if(btn)btn.style.display='none';renderConcessionsPage();}
+function updateClearBtn(){const has=['state','metro','community','rm','cd'].some(id=>getMsValues(id).length>0);const btn=document.getElementById('clearFiltersBtn');if(btn)btn.style.display=has?'inline-block':'none';}
+function renderPage(){renderConcessionsPage();}
+function populateFilters(){const bar=document.getElementById('filterBar');bar.innerHTML='';[{id:'state',defaultLabel:'All States',items:['Texas','Florida','Georgia','North Carolina','Virginia','Arizona','Colorado']},{id:'metro',defaultLabel:'All Metros',items:[...new Set(COMMUNITIES.map(c=>c.metro))]},{id:'community',defaultLabel:'All Communities',items:COMMUNITIES.map(c=>c.name)},{id:'rm',defaultLabel:'All Revenue Managers',items:[...new Set(COMMUNITIES.map(c=>c.rm))]},{id:'cd',defaultLabel:'All Community Directors',items:[...new Set(COMMUNITIES.map(c=>c.cd))]}].forEach(cfg=>{const el=buildMultiSelect(cfg);el.querySelector('.ms-trigger').dataset.default=cfg.defaultLabel;bar.appendChild(el);});const cb=document.createElement('button');cb.id='clearFiltersBtn';cb.onclick=clearAllFilters;cb.style.cssText='display:none;background:none;border:none;color:#6b7280;font-family:Inter,sans-serif;font-size:11.5px;cursor:pointer;padding:0 8px;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;';cb.textContent='Clear filters';bar.appendChild(cb);}
+document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))document.querySelectorAll('.ms-wrap').forEach(w=>w.classList.remove('open'));});
+
+// Helpers
+function switchTab(tab){currentTab=tab;document.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+tab).classList.add('active');renderConcessionsPage();}
+function toggleConcProp(id){if(expandedConcProps.has(id))expandedConcProps.delete(id);else expandedConcProps.add(id);renderConcessionsPage();}
+function toggleConcBedType(key){expandedConcBedTypes[key]=!expandedConcBedTypes[key];renderConcessionsPage();}
+function getFilteredData(){if(typeof CONCESSIONS_DATA==='undefined')return[];const sf=getMsValues('state'),mf=getMsValues('metro'),cf=getMsValues('community'),rf=getMsValues('rm'),df=getMsValues('cd');return CONCESSIONS_DATA.filter(c=>{if(sf.length&&!sf.includes(c.state))return false;if(mf.length&&!mf.includes(c.metro))return false;if(cf.length&&!cf.includes(c.name))return false;if(rf.length&&!rf.includes(c.rm))return false;if(df.length&&!df.includes(c.cd))return false;return true;});}
+
+function kpiCard(l,v,s,c){return`<div style="flex:1;background:var(--body-bg);border-radius:8px;padding:12px 16px;border:1px solid var(--border);min-width:110px;"><div style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${l}</div><div style="font-size:24px;font-weight:700;color:${c};">${v}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${s}</div></div>`;}
+function computeKPIs(filtered){
+  const allU=filtered.flatMap(c=>c.allUnits);
+  const avail=allU.filter(u=>u.status==='vacant'||u.status==='on notice');
+  const availWC=avail.filter(u=>u.hasConcession);
+  const covPct=avail.length>0?parseFloat((availWC.length/avail.length*100).toFixed(1)):0;
+  const avgAmt=availWC.length>0?Math.round(availWC.reduce((s,u)=>s+u.totalConcessionAmount,0)/availWC.length):0;
+  const avgPct=availWC.length>0?parseFloat((availWC.reduce((s,u)=>s+u.concPctOfRent,0)/availWC.length).toFixed(1)):0;
+  const allC=filtered.flatMap(c=>[...c.commConcessions,...c.bedTypes.flatMap(bt=>bt.btConcessions),...c.bedTypes.flatMap(bt=>bt.units.flatMap(u=>u.concessions))]);
+  const exp=allC.filter(c=>c.status==='Active'&&c.daysRemaining>=0&&c.daysRemaining<=14).length;
+  return{availWC:availWC.length,availTotal:avail.length,covPct,avgAmt,avgPct,expiringSoon:exp};
+}
+function updateKpiCards(k){document.getElementById('kpiCards').innerHTML=kpiCard('Units with Concession',k.availWC+'/'+k.availTotal,k.covPct+'% of available units','var(--text-primary)')+kpiCard('Avg Concession','$'+k.avgAmt,'per unit with concession','var(--text-primary)')+kpiCard('Avg Net Eff. Discount',k.avgPct+'%','of asking rent',k.avgPct>0?'var(--accent)':'var(--text-muted)')+kpiCard('Expiring \u226414 Days',k.expiringSoon,'concessions need attention',k.expiringSoon>0?'#e05252':'var(--text-muted)');}
+
+function expandBtn(open,fn){return`<button class="expand-btn ${open?'open':''}" onclick="${fn}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg></button>`;}
+function progBar(pct,color){return`<div style="display:inline-flex;align-items:center;gap:6px;">${pct}%<div style="width:40px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:${Math.min(100,pct)}%;height:100%;background:${color};border-radius:2px;"></div></div></div>`;}
+
+// Overview Table
+function getVsMkt(windsorAmt, compAmt){
+  const d=windsorAmt-compAmt;
+  if(d>100)return{label:'Above mkt',color:'#f5a623'};
+  if(d>0)return{label:'Competitive',color:'#15803d'};
+  if(d>-100)return{label:'Slightly below',color:'#92400e'};
+  return{label:'Below mkt',color:'#e05252'};
+}
+function bdg(t,bg,c){return`<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:${bg};color:${c};white-space:nowrap;">${t}</span>`;}
+
+function renderOverviewTable(data){
+  const pk='rgba(232,0,125,0.04)';const bl='rgba(96,165,250,0.04)';
+  let h=`<table class="data-table"><thead>
+    <tr>
+      <th rowspan="2" style="min-width:180px;position:sticky;left:0;background:var(--surface);z-index:12;">Community<span class="th-sub">Bed Type / Unit</span></th>
+      <th rowspan="2" style="text-align:center;">Avail.<br><span class="th-sub">Units</span></th>
+      <th colspan="4" style="text-align:center;background:rgba(232,0,125,0.06);border-bottom:2px solid rgba(232,0,125,0.2);font-size:10.5px;font-weight:700;color:var(--accent);letter-spacing:.05em;">Concessions</th>
+      <th colspan="4" style="text-align:center;background:rgba(96,165,250,0.07);border-bottom:2px solid rgba(96,165,250,0.25);font-size:10.5px;font-weight:700;color:#1d4ed8;letter-spacing:.05em;">Market</th>
+      <th rowspan="2" style="text-align:center;">Actions</th>
+    </tr>
+    <tr>
+      <th style="text-align:center;background:rgba(232,0,125,0.05);">% with<br><span class="th-sub">Concession</span></th>
+      <th style="text-align:right;background:rgba(232,0,125,0.05);">Avg Conc.<br><span class="th-sub">($)</span></th>
+      <th style="text-align:center;background:rgba(232,0,125,0.05);">Avg Conc.<br><span class="th-sub">(% rent)</span></th>
+      <th style="text-align:right;background:rgba(232,0,125,0.05);">Net Eff.<br><span class="th-sub">Rent</span></th>
+      <th style="text-align:center;background:rgba(96,165,250,0.05);">Comp.<br><span class="th-sub">Offering</span></th>
+      <th style="text-align:right;background:rgba(96,165,250,0.05);">Comp.<br><span class="th-sub">Avg</span></th>
+      <th style="text-align:right;background:rgba(96,165,250,0.05);white-space:nowrap;">Comp. Net Eff.<br><span class="th-sub">avg rent</span></th>
+      <th style="text-align:center;background:rgba(96,165,250,0.05);">vs.<br><span class="th-sub">Market</span></th>
+    </tr>
+  </thead><tbody>`;
+
+  data.forEach(comm=>{
+    const po=expandedConcProps.has(comm.id);
+    const cp=typeof PRICING_DATA!=='undefined'?PRICING_DATA.find(p=>p.id===comm.id):null;
+    const totalU=cp?cp.totalUnits:comm.allUnits.length;
+    const availU=cp?Math.round(totalU*parseFloat(cp.availPct)/100):comm.allUnits.length;
+    const ce=typeof COMPETITOR_DATA!=='undefined'?COMPETITOR_DATA.find(c=>c.commId===comm.id):null;
+    const allComps=ce?ce.competitors:[];
+    const activeComps=allComps.filter(c=>c.status==='Active');
+    const avgCompAmt=activeComps.length>0?Math.round(activeComps.reduce((s,c)=>s+c.amount,0)/activeComps.length):0;
+    const avgCompNetEff=activeComps.length>0?Math.round(activeComps.reduce((s,c)=>s+(c.netEffRent??c.baseRent??1800),0)/activeComps.length):0;
+    const avgCompCov=activeComps.length>0?parseFloat((activeComps.reduce((s,c)=>s+(c.unitCoverage??30),0)/activeComps.length).toFixed(1)):0;
+    const compBaseRent=comm.bedTypes[0]?.recRent??1800;
+    const avgCompPct=avgCompAmt>0?parseFloat((avgCompAmt/compBaseRent*100).toFixed(1)):0;
+    const vsMkt=comm.commAvgConcAmt-avgCompAmt;
+    const vm=getVsMkt(comm.commAvgConcAmt,avgCompAmt);
+    const vsDiscount=parseFloat((comm.commAvgConcPct-avgCompPct).toFixed(1));
+
+    h+=`<tr class="row-property"><td style="position:sticky;left:0;background:#fff;z-index:5;font-weight:600;">${expandBtn(po,"toggleConcProp('"+comm.id+"')")}${comm.name}</td>
+      <td style="text-align:center;"><span style="font-weight:600;">${availU}</span><span style="color:var(--text-muted);">/${totalU}</span></td>
+      <td style="background:${pk};text-align:center;">${progBar(comm.commCoveragePct,'var(--accent)')}</td>
+      <td style="background:${pk};text-align:right;">${comm.commAvgConcAmt>0?'$'+comm.commAvgConcAmt:'\u2014'}</td>
+      <td style="background:${pk};text-align:center;color:var(--text-secondary);">${comm.commAvgConcPct>0?comm.commAvgConcPct+'%':'\u2014'}</td>
+      <td style="background:${pk};text-align:right;font-weight:500;">$${comm.commAvgNetEffRent.toLocaleString()}</td>
+      <td style="background:${bl};text-align:center;"><span style="font-weight:500;">${activeComps.length}/${allComps.length}</span><span style="color:var(--text-muted);font-size:10.5px;margin-left:4px;">\u00B7 ${avgCompCov>0?avgCompCov+'%':'\u2014'}</span></td>
+      <td style="background:${bl};text-align:right;"><span style="font-weight:500;">${avgCompAmt>0?'$'+avgCompAmt:'\u2014'}</span><span style="color:var(--text-muted);font-size:10.5px;margin-left:4px;">${avgCompPct>0?'\u00B7 '+avgCompPct+'%':''}</span></td>
+      <td style="background:rgba(96,165,250,0.03);text-align:right;cursor:pointer;font-weight:500;" onclick="event.stopPropagation();openCompModal&&openCompModal('${comm.id}',null)">${avgCompNetEff>0?'$'+avgCompNetEff.toLocaleString():'\u2014'}${avgCompNetEff>0&&comm.commAvgNetEffRent>0?`<span style="display:block;font-size:10px;color:${comm.commAvgNetEffRent>avgCompNetEff?'#15803d':'#e05252'};">${comm.commAvgNetEffRent>avgCompNetEff?'+':''}$${comm.commAvgNetEffRent-avgCompNetEff}</span>`:''}</td>
+      <td style="background:${bl};text-align:center;"><span style="color:${vm.color};font-weight:600;">${vsMkt>=0?'+':''}$${vsMkt}</span><span style="color:${vm.color};font-size:10.5px;margin-left:4px;">\u00B7 ${vsDiscount>=0?'+':''}${vsDiscount}%</span></td>
+      <td style="text-align:center;"><button onclick="event.stopPropagation();openConcInfoModal('community','${comm.id}',null,null)" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif;">View</button></td>
+    </tr>`;
+    if(!po)return;
+
+    comm.bedTypes.forEach(bt=>{
+      const bk=comm.id+bt.type;const bo=expandedConcBedTypes[bk];
+      const btp=cp?cp.bedTypes.find(b=>b.type===bt.type):null;
+      const btTotal=btp?btp.totalUnits:bt.units.length;
+      const btAvail=btp?Math.round(btTotal*parseFloat(bt.availPct??cp.availPct)/100):bt.units.length;
+      const btComps=allComps.filter(c=>c.bedType===bt.type&&c.status==='Active');
+      const btCompAmt=btComps.length>0?Math.round(btComps.reduce((s,c)=>s+c.amount,0)/btComps.length):0;
+      const btCompNetEff=btComps.length>0?Math.round(btComps.reduce((s,c)=>s+(c.netEffRent??c.baseRent??1800),0)/btComps.length):0;
+      const btCompCov=btComps.length>0?parseFloat((btComps.reduce((s,c)=>s+(c.unitCoverage??30),0)/btComps.length).toFixed(1)):0;
+      const btCompPct=btCompAmt>0?parseFloat((btCompAmt/(bt.recRent||1800)*100).toFixed(1)):0;
+      const btVsMkt=bt.avgConcAmt-btCompAmt;
+      const btVm=getVsMkt(bt.avgConcAmt,btCompAmt);
+      const btVsDisc=parseFloat((bt.avgConcPct-btCompPct).toFixed(1));
+      h+=`<tr class="row-bedtype"><td style="position:sticky;left:0;background:#fafbfc;padding-left:28px;z-index:5;font-weight:500;">${expandBtn(bo,"toggleConcBedType('"+bk+"')")}${bt.type}</td>
+        <td style="text-align:center;"><span style="font-weight:500;">${btAvail}</span><span style="color:var(--text-muted);">/${btTotal}</span></td>
+        <td style="background:${pk};text-align:center;">${progBar(bt.coveragePct,'var(--accent)')}</td>
+        <td style="background:${pk};text-align:right;">${bt.avgConcAmt>0?'$'+bt.avgConcAmt:'\u2014'}</td>
+        <td style="background:${pk};text-align:center;color:var(--text-secondary);">${bt.avgConcPct>0?bt.avgConcPct+'%':'\u2014'}</td>
+        <td style="background:${pk};text-align:right;font-weight:500;">$${bt.avgNetEffRent.toLocaleString()}</td>
+        <td style="background:${bl};text-align:center;">${btComps.length>0?'<span style="font-weight:500;">'+btComps.length+'</span><span style="color:var(--text-muted);font-size:10.5px;margin-left:4px;">\u00B7 '+btCompCov+'%</span>':'\u2014'}</td>
+        <td style="background:${bl};text-align:right;">${btCompAmt>0?'<span style="font-weight:500;">$'+btCompAmt+'</span><span style="color:var(--text-muted);font-size:10.5px;margin-left:4px;">\u00B7 '+btCompPct+'%</span>':'\u2014'}</td>
+        <td style="background:rgba(96,165,250,0.03);text-align:right;font-weight:500;">${btCompNetEff>0?'$'+btCompNetEff.toLocaleString():'\u2014'}${btCompNetEff>0&&bt.avgNetEffRent>0?`<span style="display:block;font-size:10px;color:${bt.avgNetEffRent>btCompNetEff?'#15803d':'#e05252'};">${bt.avgNetEffRent>btCompNetEff?'+':''}$${bt.avgNetEffRent-btCompNetEff}</span>`:''}</td>
+        <td style="background:${bl};text-align:center;">${btComps.length>0?'<span style="color:'+btVm.color+';font-weight:600;">'+(btVsMkt>=0?'+':'')+'$'+btVsMkt+'</span><span style="color:'+btVm.color+';font-size:10.5px;margin-left:4px;">\u00B7 '+(btVsDisc>=0?'+':'')+btVsDisc+'%</span>':'\u2014'}</td>
+        <td style="text-align:center;"><button onclick="event.stopPropagation();openConcInfoModal('bedtype','${comm.id}','${bt.type}',null)" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif;">View</button></td>
+      </tr>`;
+      if(!bo)return;
+
+      bt.units.forEach(unit=>{
+        const stackBdg=unit.stackCount>=2?`<span style="background:rgba(232,0,125,0.1);color:var(--accent);font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;margin-left:4px;">${unit.stackCount} stacked</span>`:'';
+        h+=`<tr class="row-unit" style="background:${unit.hasConcession?'rgba(232,0,125,0.02)':'#fff'};">
+          <td style="position:sticky;left:0;background:inherit;padding-left:44px;z-index:5;font-size:12px;">${unit.id}${stackBdg}</td>
+          <td></td>
+          <td style="background:${pk};text-align:center;">${unit.hasConcession?'\u2713':'\u2014'}</td>
+          <td style="background:${pk};text-align:right;font-weight:${unit.totalConcessionAmount>0?'600':'400'};color:${unit.totalConcessionAmount>0?'var(--accent)':'var(--text-muted)'};">${unit.totalConcessionAmount>0?'$'+unit.totalConcessionAmount:'\u2014'}</td>
+          <td style="background:${pk};text-align:center;color:var(--text-secondary);">${unit.concPctOfRent>0?unit.concPctOfRent+'%':'\u2014'}</td>
+          <td style="background:${pk};text-align:right;font-weight:500;">$${unit.effectiveNetRent.toLocaleString()}</td>
+          <td colspan="4" style="background:rgba(96,165,250,0.03);text-align:center;color:var(--text-muted);font-size:11px;">\u2014</td>
+          <td style="text-align:center;"><button onclick="openConcInfoModal('unit','${comm.id}','${bt.type}','${unit.id}')" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif;">View</button></td>
+        </tr>`;
+      });
+    });
+  });
+  h+='</tbody></table>';
+  document.getElementById('mainContent').innerHTML=h;
+}
+
+// Unit Concession Panel
+function openUnitConcessionPanel(unitId,commId,bedType){
+  const comm=CONCESSIONS_DATA.find(c=>c.id===commId);if(!comm)return;
+  let unit=null;let bt=null;
+  comm.bedTypes.forEach(b=>b.units.forEach(u=>{if(u.id===unitId){unit=u;bt=b;}}));
+  if(!unit)return;
+  document.getElementById('unitConcPanelTitle').textContent=unitId;
+  const lvlBdg={community:'<span style="background:rgba(167,139,250,0.15);color:#6d28d9;font-size:8px;font-weight:700;border-radius:3px;padding:1px 4px;">COMM</span>',bedtype:'<span style="background:rgba(96,165,250,0.12);color:#1d4ed8;font-size:8px;font-weight:700;border-radius:3px;padding:1px 4px;">BED</span>',unit:'<span style="background:rgba(232,0,125,0.1);color:var(--accent);font-size:8px;font-weight:700;border-radius:3px;padding:1px 4px;">UNIT</span>'};
+  let list='';
+  unit.allApplicableConcessions.filter(c=>c.status==='Active').forEach(c=>{
+    const inherited=c.level!=='unit';
+    list+=`<div style="background:var(--body-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">${lvlBdg[c.level]}<span style="font-weight:500;font-size:12px;">${_concTypeLabel(c)}</span>${!c.stackable?'<span style="font-size:9px;color:#f5a623;margin-left:auto;">non-stackable</span>':''}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--accent);">-$${c.displayAmount}<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:4px;">${_concAmountLabel(c)}${c.applyTo==='gross'?' &middot; gross-up':''}</span></div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Priority ${c.priority}${inherited?' · inherited':''}</div>
+    </div>`;
+  });
+  if(!list)list='<div style="color:var(--text-muted);font-size:12px;padding:10px 0;">No active concessions</div>';
+  list+=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;font-weight:600;">Total: -$${unit.totalConcessionAmount} <span style="font-weight:400;color:var(--text-muted);">(${unit.concPctOfRent}% of rent)</span></div>`;
+  document.getElementById('unitConcActiveList').innerHTML=list;
+  document.getElementById('unitNetEffPreview').textContent='$'+unit.effectiveNetRent.toLocaleString();
+  document.getElementById('unitConcBreakdown').textContent=unit.stackedList.map(c=>_concTypeLabel(c)+' -$'+c.displayAmount).join(' + ');
+  document.getElementById('unitConcPanel').classList.add('open');
+}
+function closeUnitConcPanel(){document.getElementById('unitConcPanel').classList.remove('open');}
+
+function pauseUnitConcessions(unitId,commId){
+  const comm=CONCESSIONS_DATA.find(c=>c.id===commId);if(!comm)return;
+  comm.bedTypes.forEach(bt=>bt.units.forEach(u=>{if(u.id===unitId)u.concessions.forEach(c=>{if(c.status==='Active')c.status='Paused';});}));
+  renderConcessionsPage();showToast('Concessions paused for '+unitId);
+}
+
+// Concession Info Modal
+function openConcInfoModal(scope,commId,bedType,unitId){
+  const comm=CONCESSIONS_DATA.find(c=>c.id===commId);if(!comm)return;
+  let subtitle='',concs=[],baseRent=0;
+  if(scope==='unit'){const bt=comm.bedTypes.find(b=>b.type===bedType);const unit=bt?.units.find(u=>u.id===unitId);subtitle=unitId;concs=unit?.allApplicableConcessions??[];baseRent=unit?.baseRent??0;}
+  else if(scope==='bedtype'){const bt=comm.bedTypes.find(b=>b.type===bedType);subtitle=comm.name+' \u00B7 '+bedType;concs=[...comm.commConcessions,...(bt?.btConcessions??[])];baseRent=bt?.recRent??0;}
+  else{subtitle=comm.name+' \u2014 all levels';concs=[...comm.commConcessions,...comm.bedTypes.flatMap(bt=>bt.btConcessions)];baseRent=comm.bedTypes[0]?.recRent??0;}
+  const active=concs.filter(c=>c.status==='Active');
+  document.getElementById('concInfoSubtitle').textContent=subtitle;
+  const mLink=document.getElementById('concInfoManageLink');if(mLink)mLink.href='concessions.html?tab=management&commId='+commId+(bedType?'&bedType='+encodeURIComponent(bedType):'')+(unitId?'&unitId='+encodeURIComponent(unitId):'');
+  const emptyEl=document.getElementById('concInfoEmpty');
+  const tableEl=document.getElementById('concInfoTable');
+  if(!active.length){emptyEl.style.display='block';tableEl.style.display='none';document.getElementById('concInfoTotal').textContent='-$0';document.getElementById('concInfoTotalPct').textContent='(0%)';document.getElementById('concInfoNetEff').textContent='$'+baseRent.toLocaleString();openModal('concInfoModal');return;}
+  emptyEl.style.display='none';tableEl.style.display='table';
+  const totalAmt=active.filter(c=>c.applyTo!=='gross').reduce((s,c)=>s+c.displayAmount,0);const totalPct=baseRent>0?parseFloat((totalAmt/baseRent*100).toFixed(1)):0;const netEff=Math.max(0,baseRent-totalAmt);
+  const lc={community:{l:'COMMUNITY',bg:'rgba(167,139,250,0.15)',c:'#6d28d9'},bedtype:{l:'BED TYPE',bg:'rgba(96,165,250,0.12)',c:'#1d4ed8'},unit:{l:'UNIT',bg:'rgba(232,0,125,0.1)',c:'var(--accent)'}};
+  const ltc={'New Lease':{bg:'rgba(232,0,125,0.08)',c:'var(--accent)'},'Renewal':{bg:'rgba(96,165,250,0.1)',c:'#1d4ed8'},'Both':{bg:'rgba(148,163,184,0.1)',c:'#475569'}};
+  const stc={'Active':{bg:'rgba(74,222,128,0.12)',c:'#15803d'},'Paused':{bg:'rgba(148,163,184,0.12)',c:'#475569'},'Expired':{bg:'rgba(148,163,184,0.1)',c:'#6b7280'}};
+  document.getElementById('concInfoBody').innerHTML=active.map(c=>{const l=lc[c.level]||lc.unit;const lt=ltc[c.leaseType]||ltc.Both;const s=stc[c.status]||stc.Active;const amtD=_concAmountLabel(c);const pctD=baseRent>0?parseFloat((c.displayAmount/baseRent*100).toFixed(1))+'%':'\u2014';const lvlHtml=c.level==='bedtype'&&c.bedType?`<span style="background:${l.bg};color:${l.c};font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;display:block;">${l.l}</span><span style="font-size:10px;color:var(--text-muted);margin-top:2px;display:block;">${c.bedType}</span>`:`<span style="background:${l.bg};color:${l.c};font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;">${l.l}</span>`;return`<tr style="border-bottom:1px solid var(--border);"><td>${lvlHtml}</td><td style="font-weight:500;">${_concTypeLabel(c)}${c.applyTo==='gross'?' <span style="font-size:9px;color:var(--text-muted);font-weight:400;">&middot; gross-up</span>':''}</td><td style="font-weight:600;">${amtD}</td><td style="text-align:center;color:var(--text-secondary);">${pctD}</td><td><span style="background:${lt.bg};color:${lt.c};font-size:10px;font-weight:500;border-radius:10px;padding:2px 7px;">${c.leaseType}</span></td><td style="font-size:11.5px;color:var(--text-secondary);white-space:nowrap;">${c.startDate} \u2192 ${c.endDate}</td><td><span style="background:${s.bg};color:${s.c};font-size:11px;font-weight:500;border-radius:10px;padding:2px 7px;">${c.status}</span></td><td style="text-align:center;font-size:13px;">${c.stackable?'<span style="color:#15803d;">\u2713</span>':'<span style="color:#e05252;">\u2717</span>'}</td><td style="text-align:center;"><span style="background:var(--body-bg);border:1px solid var(--border-mid);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;cursor:help;" title="Priority ${c.priority} \u2014 ${c.stackable?'stackable with other concessions':'non-stackable: overrides lower priority concessions'}">${c.priority}</span></td></tr>`;}).join('');
+  document.getElementById('concInfoTotal').textContent='-$'+totalAmt;
+  document.getElementById('concInfoTotalPct').textContent='('+totalPct+'% of rent)';
+  document.getElementById('concInfoNetEff').textContent='$'+netEff.toLocaleString();
+  openModal('concInfoModal');
+}
+
+// Management Tab
+function getDefaultAutoParams(){return{targetCoverage:25,triggerVacancyDays:14,defaultType:'Flat monthly',defaultAmount:150,maxCap:500,expireAfterDays:30,applyTo:'Both'};}
+
+function renderManagementTab(filtered){
+  const mc=document.getElementById('mgmtContainer');if(!mc)return;
+  mc.style.display='flex';mc.innerHTML=`<div style="display:flex;height:100%;width:100%;overflow:hidden;">
+    <div id="mgmtNav" style="width:300px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;background:var(--surface);">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Communities</span><input type="text" id="mgmtNavSearch" placeholder="Search..." oninput="filterMgmtNav()" style="width:120px;border:1px solid var(--border-mid);border-radius:var(--radius);padding:4px 8px;font-family:'Inter',sans-serif;font-size:11.5px;outline:none;"></div>
+      <div id="mgmtNavList"></div>
+    </div>
+    <div id="mgmtPanel" style="flex:1;overflow-y:auto;padding:20px 24px;">${!selectedMgmtCommId?'<div style="padding:60px 20px;text-align:center;color:var(--text-muted);"><div style="font-size:14px;font-weight:500;margin-bottom:6px;">Select a community</div><div style="font-size:12px;">Choose from the left panel to manage concessions</div></div>':''}</div>
+  </div>`;
+  renderMgmtNav(filtered);
+  if(selectedMgmtCommId)renderMgmtPanel();
+}
+
+function renderMgmtNav(filtered){
+  const list=document.getElementById('mgmtNavList');if(!list)return;
+  const q=(document.getElementById('mgmtNavSearch')?.value||'').toLowerCase();
+  let h='';
+  filtered.forEach(comm=>{
+    if(q&&!comm.name.toLowerCase().includes(q))return;
+    const isExp=expandedMgmtComms.has(comm.id);const isSel=selectedMgmtCommId===comm.id&&!selectedMgmtBedType;
+    const totalAc=comm.commConcessions.filter(c=>c.status==='Active').length+comm.bedTypes.reduce((s,bt)=>s+bt.btConcessions.filter(c=>c.status==='Active').length,0);
+    h+=`<div style="border-bottom:1px solid var(--border);">
+      <div onclick="selectMgmtComm('${comm.id}')" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;background:${isSel?'rgba(232,0,125,0.08)':'transparent'};border-left:3px solid ${isSel?'var(--accent)':'transparent'};transition:background .1s;">
+        <button onclick="event.stopPropagation();toggleMgmtComm('${comm.id}')" style="background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);display:flex;align-items:center;transition:transform .15s;transform:rotate(${isExp?'90':'0'}deg);"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg></button>
+        <span style="font-size:12.5px;font-weight:${isSel?'600':'500'};color:${isSel?'var(--accent)':'var(--text-primary)'};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${comm.name}</span>
+        ${totalAc>0?`<span style="background:rgba(232,0,125,0.1);color:var(--accent);font-size:10px;font-weight:600;border-radius:10px;padding:1px 7px;flex-shrink:0;">${totalAc}</span>`:''}
+      </div>
+      ${isExp?comm.bedTypes.map(bt=>{const bSel=selectedMgmtCommId===comm.id&&selectedMgmtBedType===bt.type&&!selectedMgmtUnitId;const bAc=bt.btConcessions.filter(c=>c.status==='Active').length;const btKey=comm.id+'|'+bt.type;const btExp=expandedMgmtBedTypes.has(btKey);
+        let btHtml=`<div onclick="selectMgmtBedType('${comm.id}','${bt.type}')" style="display:flex;align-items:center;gap:8px;padding:8px 16px 8px 28px;cursor:pointer;background:${bSel?'rgba(232,0,125,0.06)':'#fafbfc'};border-left:3px solid ${bSel?'var(--accent)':'transparent'};">
+          <button onclick="event.stopPropagation();toggleMgmtBtNav('${comm.id}','${bt.type}')" style="background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);display:flex;align-items:center;transition:transform .15s;transform:rotate(${btExp?'90':'0'}deg);"><svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg></button>
+          <span style="font-size:12px;color:${bSel?'var(--accent)':'var(--text-secondary)'};font-weight:${bSel?'600':'400'};flex:1;">${bt.type}</span>${bAc>0?`<span style="background:rgba(232,0,125,0.08);color:var(--accent);font-size:10px;font-weight:600;border-radius:10px;padding:1px 6px;">${bAc}</span>`:`<span style="font-size:10px;color:var(--text-muted);">\u2014</span>`}</div>`;
+        if(btExp){const cd=CONCESSIONS_DATA.find(c=>c.id===comm.id);const bd=cd?.bedTypes.find(b=>b.type===bt.type);(bd?.units??[]).forEach(u=>{const uSel=selectedMgmtCommId===comm.id&&selectedMgmtBedType===bt.type&&selectedMgmtUnitId===u.id;const uAc=u.concessions.filter(c=>c.status==='Active').length;btHtml+=`<div onclick="selectMgmtUnit('${comm.id}','${bt.type}','${u.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 52px;cursor:pointer;background:${uSel?'rgba(232,0,125,0.06)':'#f8f9fa'};border-left:3px solid ${uSel?'var(--accent)':'transparent'};border-bottom:1px solid var(--border);"><span style="font-size:11px;color:${uSel?'var(--accent)':'var(--text-muted)'};font-weight:${uSel?'600':'400'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.id}</span>${uAc>0?`<span style="background:rgba(232,0,125,0.08);color:var(--accent);font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;">${uAc}</span>`:`<span style="font-size:10px;color:var(--text-muted);">\u2014</span>`}</div>`;});}
+        return btHtml;}).join(''):''}
+    </div>`;
+  });
+  list.innerHTML=h||'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">No communities found</div>';
+}
+function toggleMgmtComm(id){if(expandedMgmtComms.has(id))expandedMgmtComms.delete(id);else expandedMgmtComms.add(id);renderMgmtNav(getFilteredData());}
+function selectMgmtComm(id){selectedMgmtCommId=id;selectedMgmtBedType=null;selectedMgmtUnitId=null;expandedMgmtComms.add(id);renderMgmtNav(getFilteredData());renderMgmtPanel();}
+function selectMgmtBedType(cid,bt){selectedMgmtCommId=cid;selectedMgmtBedType=bt;selectedMgmtUnitId=null;renderMgmtNav(getFilteredData());renderMgmtPanel();}
+function toggleMgmtBtNav(cid,bt){const k=cid+'|'+bt;if(expandedMgmtBedTypes.has(k))expandedMgmtBedTypes.delete(k);else expandedMgmtBedTypes.add(k);renderMgmtNav(getFilteredData());}
+function selectMgmtUnit(cid,bt,uid){selectedMgmtCommId=cid;selectedMgmtBedType=bt;selectedMgmtUnitId=uid;expandedMgmtComms.add(cid);expandedMgmtBedTypes.add(cid+'|'+bt);renderMgmtNav(getFilteredData());renderMgmtPanel();}
+function filterMgmtNav(){renderMgmtNav(getFilteredData());}
+
+function recomputeUnitStack(unit,commData,btData){
+  const allApp=[...commData.commConcessions,...btData.btConcessions,...unit.concessions].filter(c=>{if(c.excludeAffordable&&unit.rcStatus==='AF')return false;if(c.excludeRC&&unit.rcStatus==='RC')return false;return true;});
+  const{totalAmount,effectiveRent,stackedList}=computeUnitConcessions(unit.baseRent,allApp);
+  unit.allApplicableConcessions=allApp;unit.stackedList=stackedList;unit.totalConcessionAmount=totalAmount;unit.effectiveNetRent=effectiveRent;unit.concPctOfRent=unit.baseRent>0?parseFloat((totalAmount/unit.baseRent*100).toFixed(1)):0;unit.hasConcession=totalAmount>0;unit.stackCount=stackedList.length;
+}
+
+function renderMgmtConcRow(c, isInh) {
+  const sc = {'Active':{bg:'rgba(74,222,128,0.12)',c:'#15803d'},'Paused':{bg:'rgba(148,163,184,0.12)',c:'#475569'},'Expired':{bg:'rgba(148,163,184,0.1)',c:'#6b7280'}};
+  const s = sc[c.status] || sc.Active;
+  const ltc = {'New Lease':{bg:'rgba(232,0,125,0.08)',c:'var(--accent)'},'Renewal':{bg:'rgba(96,165,250,0.1)',c:'#1d4ed8'},'Both':{bg:'rgba(148,163,184,0.1)',c:'#475569'}};
+  const lt = ltc[c.leaseType] || ltc.Both;
+  const amtD = _concAmountLabel(c);
+  const typeCell = `${_concTypeLabel(c)}${c.applyTo==='gross'?' <span style="font-size:9px;color:var(--text-muted);font-weight:400;">&middot; gross-up</span>':''}`;
+  const excl = [c.excludeAffordable ? 'No AF' : null, c.excludeRC ? 'No RC' : null].filter(Boolean).join(', ') || '\u2014';
+  const lvlCfg = {community:{l:'COMM',bg:'rgba(167,139,250,0.15)',c:'#6d28d9'},bedtype:{l:'BED',bg:'rgba(96,165,250,0.12)',c:'#1d4ed8'},unit:{l:'UNIT',bg:'rgba(232,0,125,0.1)',c:'var(--accent)'}};
+  const lv = lvlCfg[c.level] || lvlCfg.unit;
+  const actionsCell = isInh
+    ? '<span style="font-size:11px;color:var(--text-muted);">inherited</span>'
+    : `<div style="display:inline-flex;gap:6px;justify-content:center;align-items:center;flex-wrap:nowrap;white-space:nowrap;"><button onclick="editMgmtConc('${c.id}')" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 7px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif;">Edit</button><button onclick="toggleMgmtPause('${c.id}')" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 7px;font-size:11px;color:${c.status==='Paused'?'var(--accent)':'var(--text-secondary)'};cursor:pointer;font-family:'Inter',sans-serif;">${c.status==='Paused'?'Resume':'Pause'}</button><button onclick="toggleConcHistory('${c.id}')" style="background:none;border:1px solid var(--border-mid);border-radius:4px;padding:3px 7px;font-size:11px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif;">History</button><button onclick="removeMgmtConc('${c.id}')" style="background:none;border:1px solid rgba(248,113,113,0.4);border-radius:4px;padding:3px 7px;font-size:11px;color:#e05252;cursor:pointer;font-family:'Inter',sans-serif;">Remove</button></div>`;
+  const main = `<tr style="border-bottom:1px solid var(--border);opacity:${isInh?'.65':'1'};"><td><span style="background:${lv.bg};color:${lv.c};font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;">${lv.l}</span></td><td style="font-weight:500;">${typeCell}</td><td style="font-weight:600;color:var(--accent);">${amtD}</td><td><span style="background:${lt.bg};color:${lt.c};font-size:10px;font-weight:500;border-radius:10px;padding:2px 7px;">${c.leaseType}</span></td><td style="font-size:11.5px;color:var(--text-secondary);white-space:nowrap;">${c.startDate} \u2192 ${c.endDate}</td><td style="text-align:center;font-size:13px;">${c.stackable?'<span style="color:#15803d;">\u2713</span>':'<span style="color:#e05252;">\u2717</span>'}</td><td style="text-align:center;"><span style="background:var(--body-bg);border:1px solid var(--border-mid);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;">${c.priority}</span></td><td style="font-size:11.5px;color:var(--text-secondary);">${excl}</td><td><span style="background:${s.bg};color:${s.c};font-size:11px;font-weight:500;border-radius:10px;padding:2px 7px;">${c.status}</span></td><td style="text-align:center;">${actionsCell}</td></tr>`;
+  if (isInh) return main;
+  const createdLine = `<span>Created by <strong style="color:var(--text-primary);">${c.createdBy ?? 'Unknown'}</strong>${c.createdAt ? ' on ' + c.createdAt : ''}</span>${c.editedBy ? `<span style="color:var(--text-muted);">·</span><span>Last edited by <strong style="color:var(--text-primary);">${c.editedBy}</strong>${c.editedAt ? ' on ' + c.editedAt : ''}</span>` : ''}`;
+  const histLog = (c.history && c.history.length > 0)
+    ? `<div style="display:flex;flex-direction:column;gap:6px;padding-left:4px;border-left:2px solid var(--border-mid);">${c.history.map(h => `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-left:10px;font-size:12px;"><span style="color:var(--text-muted);white-space:nowrap;min-width:90px;">${h.date}</span><span style="font-weight:500;color:var(--text-secondary);">${h.editedBy}</span><span style="color:var(--text-muted);">changed ${h.field}:</span><span style="color:var(--text-muted);text-decoration:line-through;">${h.oldValue}</span><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><line x1="2" y1="7" x2="12" y2="7"/><polyline points="8,3 12,7 8,11"/></svg><span style="color:var(--text-primary);font-weight:500;">${h.newValue}</span></div>`).join('')}</div>`
+    : '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">No changes recorded</div>';
+  const hist = `<tr id="hist-${c.id}" style="display:none;background:var(--body-bg);border-bottom:1px solid var(--border);"><td colspan="10" style="padding:0;"><div style="padding:14px 18px;"><div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;">${createdLine}</div>${histLog}</div></td></tr>`;
+  return main + hist;
+}
+
+function toggleConcHistory(concId) {
+  const row = document.getElementById('hist-' + concId);
+  if (!row) return;
+  const isHidden = row.style.display === 'none' || row.style.display === '';
+
+  // Close all other open history rows and reset their buttons
+  document.querySelectorAll('[id^="hist-"]').forEach(r => {
+    r.style.display = 'none';
+    const otherId = r.id.replace('hist-', '');
+    const otherBtn = document.querySelector(`button[onclick="toggleConcHistory('${otherId}')"]`);
+    if (otherBtn) {
+      otherBtn.textContent = 'History';
+      otherBtn.style.color = 'var(--text-secondary)';
+      otherBtn.style.borderColor = 'var(--border-mid)';
+    }
+  });
+
+  if (isHidden) {
+    row.style.display = 'table-row';
+    const btn = document.querySelector(`button[onclick="toggleConcHistory('${concId}')"]`);
+    if (btn) {
+      btn.textContent = 'Hide';
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+    }
+  }
+}
+
+function renderMgmtPanel(){
+  const panel=document.getElementById('mgmtPanel');if(!panel)return;
+  const comm=CONCESSIONS_DATA.find(c=>c.id===selectedMgmtCommId);if(!comm)return;
+  const btData=selectedMgmtBedType?comm.bedTypes.find(b=>b.type===selectedMgmtBedType):null;
+
+  // Unit scope
+  if(selectedMgmtUnitId&&btData){
+    const unit=btData.units.find(u=>u.id===selectedMgmtUnitId);
+    if(!unit){panel.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted);">Unit not found</div>';return;}
+    const stBdg={'vacant':{l:'VC',bg:'#f87171',c:'#fff'},'on notice':{l:'ON',bg:'#94a3b8',c:'#fff'}};const sCfg=stBdg[unit.status]||stBdg.vacant;
+    const allActive=(unit.allApplicableConcessions||[]).filter(c=>c.status==='Active');
+    panel.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+        <div><h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:2px;">${unit.id}</h2><span style="font-size:12px;color:var(--text-muted);">${comm.name} \u00B7 ${btData.type} \u2014 unit-level concessions</span></div>
+        <button onclick="openAddConcForm()" class="btn btn-primary" style="font-size:12px;padding:7px 14px;">+ Add Unit Concession</button>
+      </div>
+      <div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">All Active Concessions on This Unit</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Shows concessions from all levels that apply to this unit</div>
+        ${allActive.length===0?'<div style="padding:16px;background:var(--body-bg);border-radius:8px;border:1px dashed var(--border-mid);text-align:center;color:var(--text-muted);font-size:12.5px;">No concessions currently apply to this unit</div>':`<table class="data-table" style="margin-bottom:0;"><thead><tr><th style="min-width:70px;">Level</th><th>Type</th><th>Value</th><th>Lease Type</th><th>Valid Period</th><th style="text-align:center;">Stackable</th><th style="text-align:center;">Priority</th><th>Exclusions</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>${allActive.map(c=>{const isUnit=c.level==='unit';return renderMgmtConcRow(c,!isUnit);}).join('')}</tbody></table>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--border);margin-top:4px;">
+          <div><span style="font-size:12px;color:var(--text-muted);">Total stacked:</span><span style="font-size:16px;font-weight:700;color:var(--accent);margin-left:8px;">-$${unit.totalConcessionAmount}</span><span style="font-size:12px;color:var(--text-muted);margin-left:6px;">(${unit.concPctOfRent}% of rent)</span></div>
+          <div><span style="font-size:12px;color:var(--text-muted);">Net Eff. Rent:</span><span style="font-size:16px;font-weight:700;color:var(--text-primary);margin-left:8px;">$${unit.effectiveNetRent.toLocaleString()}</span></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Community and bed type concessions are managed at their respective levels.</div>`}
+      </div>
+      ${_buildConcFormHtml({ includeExclude: false, saveFn: 'saveUnitConc', defaultTitle: 'New Unit Concession' })}
+      <div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Unit Details</div>
+        <div style="background:var(--body-bg);border-radius:10px;border:1px solid var(--border);padding:16px 20px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div><div style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px;">Base Rent</div><div style="font-size:14px;font-weight:600;">$${unit.baseRent.toLocaleString()}</div></div>
+            <div><div style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px;">Status</div><div><span style="display:inline-flex;align-items:center;justify-content:center;background:${sCfg.bg};color:${sCfg.c};font-size:9px;font-weight:700;border-radius:3px;padding:1px 4px;min-width:20px;">${sCfg.l}</span></div></div>
+            <div><div style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px;">Days on Market</div><div style="font-size:14px;font-weight:600;">${unit.daysOnMarket??'\u2014'}d</div></div>
+            <div><div style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px;">Avail. Date</div><div style="font-size:13px;">${unit.availDate||'\u2014'}</div></div>
+            <div><div style="font-size:10.5px;color:var(--text-muted);margin-bottom:2px;">Move-out</div><div style="font-size:13px;">${unit.moveOut||'\u2014'}</div></div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Community / bed type scope
+  const bt=btData;
+  const scopeLabel=bt?comm.name+' \u00B7 '+bt.type:comm.name;
+  const scopeConcs=bt?bt.btConcessions:comm.commConcessions;
+  const inheritedConcs=bt?comm.commConcessions:[];
+  const autoParams=bt?(bt.autoParams??getDefaultAutoParams()):(comm.autoParams??getDefaultAutoParams());
+
+  panel.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div><h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:2px;">${scopeLabel}</h2><span style="font-size:12px;color:var(--text-muted);">${bt?'Bed type concessions apply to all '+bt.type+' units':'Community-level concessions apply to all units'}</span></div>
+      <button onclick="openAddConcForm()" class="btn btn-primary" style="font-size:12px;padding:7px 14px;">+ Add Concession</button>
+    </div>
+    <div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Configured Concessions</div>
+      ${scopeConcs.length===0?'<div style="padding:16px;background:var(--body-bg);border-radius:8px;border:1px dashed var(--border-mid);text-align:center;color:var(--text-muted);font-size:12.5px;">No concessions configured at this level</div>':`<table class="data-table" style="margin-bottom:0;"><thead><tr><th style="min-width:70px;">Level</th><th>Type</th><th>Value</th><th>Lease Type</th><th>Valid Period</th><th style="text-align:center;">Stackable</th><th style="text-align:center;">Priority</th><th>Exclusions</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>${scopeConcs.map(c=>renderMgmtConcRow(c,false)).join('')}</tbody></table>`}
+      ${inheritedConcs.length>0?`<div style="margin-top:14px;"><div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Inherited from community level <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;">(read-only)</span></div><table class="data-table" style="opacity:.7;"><tbody>${inheritedConcs.map(c=>renderMgmtConcRow(c,true)).join('')}</tbody></table></div>`:''}
+    </div>
+    ${_buildConcFormHtml({ includeExclude: true, saveFn: 'saveMgmtConc', defaultTitle: 'New Concession' })}
+    <div style="margin-bottom:28px;"><div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Automated Concession Parameters</div>
+      <div style="background:var(--body-bg);border-radius:10px;border:1px solid var(--border);padding:18px 20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Target Coverage <span style="font-size:10.5px;font-weight:400;color:var(--text-muted);">% of available</span></div><div style="display:flex;align-items:center;gap:10px;"><input type="range" id="ap_coverage" value="${autoParams.targetCoverage}" min="0" max="100" step="5" oninput="document.getElementById('ap_coverageVal').textContent=this.value+'%'" style="flex:1;accent-color:var(--accent);"><span id="ap_coverageVal" style="font-size:14px;font-weight:600;min-width:40px;text-align:right;">${autoParams.targetCoverage}%</span></div></div>
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Trigger After Days Vacant</div><div style="display:flex;align-items:center;gap:8px;"><input type="number" id="ap_vacancyDays" value="${autoParams.triggerVacancyDays??14}" style="width:80px;border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;outline:none;text-align:center;"><span style="font-size:12.5px;color:var(--text-secondary);">days</span></div></div>
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Default Type</div><select id="ap_defaultType" style="width:100%;border:1px solid var(--border-mid);border-radius:var(--radius);padding:8px 10px;font-family:'Inter',sans-serif;font-size:12.5px;background:var(--surface);outline:none;appearance:none;">${CONCESSION_TYPE_OPTIONS.map(t=>`<option ${t===autoParams.defaultType?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Default Amount</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:14px;font-weight:600;color:var(--text-secondary);">$</span><input type="number" id="ap_defaultAmt" value="${autoParams.defaultAmount}" style="flex:1;border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;outline:none;"></div></div>
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Max Cap</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:14px;font-weight:600;color:var(--text-secondary);">$</span><input type="number" id="ap_maxCap" value="${autoParams.maxCap}" style="flex:1;border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;outline:none;"></div></div>
+          <div><div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;">Auto-expire After</div><div style="display:flex;align-items:center;gap:8px;"><input type="number" id="ap_expireDays" value="${autoParams.expireAfterDays}" style="width:80px;border:1px solid var(--border-mid);border-radius:var(--radius);padding:7px 10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;outline:none;text-align:center;"><span style="font-size:12.5px;color:var(--text-secondary);">days</span></div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);"><button onclick="saveAutoParams()" class="btn btn-primary" style="font-size:12px;">Save Parameters</button></div>
+      </div>
+    </div>`;
+}
+
+// ── New/Edit Concession form ─────────────────────────────────────────
+// Live form state. The form markup is re-injected on every renderMgmtPanel
+// call, so these variables hold the canonical selection and are re-synced
+// to the DOM via setConcValueType / setConcApplyTo / setLeaseType / pills.
+let selectedConcValueType = 'flat_monthly';   // 'flat_monthly' | 'total_dollar' | 'pct_monthly_rent'
+let selectedConcApplyTo   = 'net_eff';        // 'net_eff' | 'gross'
+let selectedConcTerms     = new Set();        // Set<number> — months in applicableLeaseTerms
+let _concStartPicker      = null;
+let _concEndPicker        = null;
+
+// Returns the full form HTML as a template string. Called twice by
+// renderMgmtPanel: unit scope (no Exclude row) and community/bedtype scope.
+function _buildConcFormHtml({ includeExclude, saveFn, defaultTitle }) {
+  const dateIcon = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="11" height="10" rx="1"/><line x1="1.5" y1="5.5" x2="12.5" y2="5.5"/><line x1="4.5" y1="1" x2="4.5" y2="4"/><line x1="9.5" y1="1" x2="9.5" y2="4"/></svg>`;
+  return `
+    <div id="addConcForm" style="display:none;margin-bottom:28px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;"><span id="addConcFormTitle">${defaultTitle}</span></div>
+      <div style="background:var(--body-bg);border-radius:10px;border:1px solid var(--border);padding:18px 20px;">
+
+        <!-- 1. Concession Type (three radios with conditional input) -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600;">Concession Type</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="fc_valueType" value="flat_monthly" onchange="setConcValueType('flat_monthly')" style="accent-color:var(--accent);">
+              <span>Flat monthly</span>
+            </label>
+            <div id="fc_input_flat_monthly" class="conc-radio-input">
+              <span style="color:var(--text-secondary);font-size:13px;font-weight:500;">$</span>
+              <input type="number" id="fc_val_flat_monthly" min="0" step="1" placeholder="150">
+              <span style="color:var(--text-muted);font-size:12px;">per month</span>
+            </div>
+
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="fc_valueType" value="total_dollar" onchange="setConcValueType('total_dollar')" style="accent-color:var(--accent);">
+              <span>Total $ amount</span>
+            </label>
+            <div id="fc_input_total_dollar" class="conc-radio-input">
+              <span style="color:var(--text-secondary);font-size:13px;font-weight:500;">$</span>
+              <input type="number" id="fc_val_total_dollar" min="0" step="1" placeholder="1500">
+              <span style="color:var(--text-muted);font-size:12px;">total over lease</span>
+            </div>
+
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="fc_valueType" value="pct_monthly_rent" onchange="setConcValueType('pct_monthly_rent')" style="accent-color:var(--accent);">
+              <span>Total amount as % of monthly rent</span>
+            </label>
+            <div id="fc_input_pct_monthly_rent" class="conc-radio-input">
+              <input type="number" id="fc_val_pct_monthly_rent" min="0" max="100" step="1" placeholder="50">
+              <span style="color:var(--text-secondary);font-size:13px;font-weight:500;">%</span>
+              <span style="color:var(--text-muted);font-size:12px;">of 1 month&rsquo;s rent</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 2. Apply to (Net Effective vs Gross) toggle -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Apply to</div>
+            <span title="Net Effective: discount the tenant's true monthly cost. Gross: bump advertised rent to preserve the net effective target." style="cursor:help;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--border-mid);color:var(--text-secondary);font-size:10px;font-weight:700;">?</span>
+          </div>
+          <div style="display:flex;border:1px solid var(--border-mid);border-radius:var(--radius);overflow:hidden;max-width:360px;">
+            <button type="button" id="fc_apply_net_eff" onclick="setConcApplyTo('net_eff')" style="flex:1;padding:8px 14px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;background:var(--surface);color:var(--text-secondary);">Net Effective</button>
+            <button type="button" id="fc_apply_gross"   onclick="setConcApplyTo('gross')"   style="flex:1;padding:8px 14px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;background:var(--surface);color:var(--text-secondary);">Gross</button>
+          </div>
+        </div>
+
+        <!-- 3. Applicable Lease Terms -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Applicable Lease Terms</div>
+            <div style="display:flex;gap:12px;">
+              <button type="button" onclick="selectAllConcTerms()" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:500;cursor:pointer;padding:0;">Select all</button>
+              <button type="button" onclick="clearAllConcTerms()"  style="background:none;border:none;color:var(--text-muted);font-size:11px;font-weight:500;cursor:pointer;padding:0;">Clear</button>
+            </div>
+          </div>
+          <div id="fc_termPills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          <div id="fc_termPillsEmpty" style="display:none;font-size:11.5px;color:var(--text-muted);font-style:italic;">No lease terms are currently marked available for this scope &mdash; configure availability in Term Management.</div>
+        </div>
+
+        <!-- 4. Applies to (New Lease / Renewal / Both) — unchanged -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600;">Applies to</div>
+          <div style="display:flex;border:1px solid var(--border-mid);border-radius:var(--radius);overflow:hidden;max-width:360px;">
+            ${['New Lease','Renewal','Both'].map((lt,i)=>`<button type="button" id="ltype_${i}" onclick="setLeaseType(${i})" style="flex:1;padding:8px 8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;background:${i===2?'var(--accent)':'var(--surface)'};color:${i===2?'#fff':'var(--text-secondary)'};font-weight:${i===2?'600':'400'};">${lt}</button>`).join('')}
+          </div>
+        </div>
+
+        <!-- 5. Stackable + Priority -->
+        <div style="margin-bottom:20px;display:flex;gap:20px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" id="fc_stackable" checked style="accent-color:var(--accent);">Stackable</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--text-secondary);">Priority</span>
+            <input type="number" id="fc_priority" value="1" min="1" style="width:52px;border:1px solid var(--border-mid);border-radius:var(--radius);padding:5px 8px;font-family:'Inter',sans-serif;font-size:12px;text-align:center;outline:none;">
+          </div>
+        </div>
+
+        <!-- 6. Offer Start + Offer End (side-by-side shared custom date picker) -->
+        <div style="margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600;">Offer Start</div>
+            <button type="button" id="fc_start_trigger" class="conc-date-trigger is-placeholder">${dateIcon}<span id="fc_start_label">Start date</span></button>
+          </div>
+          <div>
+            <div style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600;">Offer End</div>
+            <button type="button" id="fc_end_trigger" class="conc-date-trigger is-placeholder">${dateIcon}<span id="fc_end_label">End date</span></button>
+          </div>
+        </div>
+
+        ${includeExclude ? `
+        <!-- 7. Exclude (AF / RC) — community / bedtype scope only -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:20px;align-items:center;">
+          <span style="font-size:12px;color:var(--text-secondary);font-weight:500;">Exclude:</span>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" id="fc_excludeAF" style="accent-color:var(--accent);">Affordable (AF)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" id="fc_excludeRC" style="accent-color:var(--accent);">Rent Controlled (RC)</label>
+        </div>` : ''}
+
+        <!-- 8. Footer -->
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <button type="button" onclick="cancelConcForm()" class="btn btn-ghost" style="font-size:12px;">Cancel</button>
+          <button type="button" onclick="${saveFn}()" class="btn btn-primary" style="font-size:12px;"><span id="saveConcBtnLabel">Save Concession</span></button>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+function setConcValueType(vt) {
+  selectedConcValueType = vt;
+  document.querySelectorAll('input[name="fc_valueType"]').forEach(r => { r.checked = r.value === vt; });
+  ['flat_monthly','total_dollar','pct_monthly_rent'].forEach(id => {
+    const el = document.getElementById('fc_input_' + id);
+    if (el) el.classList.toggle('open', id === vt);
+  });
+}
+
+function setConcApplyTo(mode) {
+  selectedConcApplyTo = mode;
+  const paint = (id, on) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.style.background = on ? 'var(--accent)' : 'var(--surface)';
+    b.style.color      = on ? '#fff'           : 'var(--text-secondary)';
+    b.style.fontWeight = on ? '600'             : '400';
+  };
+  paint('fc_apply_net_eff', mode === 'net_eff');
+  paint('fc_apply_gross',   mode === 'gross');
+}
+
+function setLeaseType(i) {
+  selectedLeaseType = i;
+  [0,1,2].forEach(j => {
+    const b = document.getElementById('ltype_' + j);
+    if (!b) return;
+    b.style.background = j === i ? 'var(--accent)' : 'var(--surface)';
+    b.style.color      = j === i ? '#fff'          : 'var(--text-secondary)';
+    b.style.fontWeight = j === i ? '600'           : '400';
+  });
+}
+
+function _renderTermPills() {
+  const terms = getAvailableTermsForScope(selectedMgmtCommId, selectedMgmtBedType);
+  const wrap  = document.getElementById('fc_termPills');
+  const empty = document.getElementById('fc_termPillsEmpty');
+  if (!wrap) return;
+  if (!terms.length) {
+    wrap.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  wrap.innerHTML = terms.map(m => {
+    const sel = selectedConcTerms.has(m);
+    return `<span class="conc-term-pill${sel?' selected':''}" onclick="toggleConcTerm(${m})">
+      <input type="checkbox" ${sel?'checked':''} data-term="${m}" tabindex="-1" style="pointer-events:none;">${m} mo
+    </span>`;
+  }).join('');
+}
+
+function toggleConcTerm(m) {
+  if (selectedConcTerms.has(m)) selectedConcTerms.delete(m);
+  else                          selectedConcTerms.add(m);
+  _renderTermPills();
+}
+
+function selectAllConcTerms() {
+  getAvailableTermsForScope(selectedMgmtCommId, selectedMgmtBedType).forEach(m => selectedConcTerms.add(m));
+  _renderTermPills();
+}
+
+function clearAllConcTerms() {
+  selectedConcTerms.clear();
+  _renderTermPills();
+}
+
+// Wire the two SingleDatePicker instances to the Offer Start / End triggers.
+// Prior instances' popup panels live on document.body — remove them before
+// rebuilding so re-renders don't leak orphan popups.
+function _initConcFormPickers(startDate, endDate) {
+  if (_concStartPicker?.picker) _concStartPicker.picker.remove();
+  if (_concEndPicker?.picker)   _concEndPicker.picker.remove();
+  const startTrig = document.getElementById('fc_start_trigger');
+  const endTrig   = document.getElementById('fc_end_trigger');
+  const startLbl  = document.getElementById('fc_start_label');
+  const endLbl    = document.getElementById('fc_end_label');
+  if (!startTrig || !endTrig) { _concStartPicker = null; _concEndPicker = null; return; }
+  _concStartPicker = new SingleDatePicker({ trigger: startTrig, labelEl: startLbl, placeholder: 'Start date' });
+  _concEndPicker   = new SingleDatePicker({ trigger: endTrig,   labelEl: endLbl,   placeholder: 'End date'   });
+  if (startDate) _concStartPicker.setDate(startDate);
+  if (endDate)   _concEndPicker.setDate(endDate);
+}
+
+function _setValueInput(vt, value) {
+  const el = document.getElementById('fc_val_' + vt);
+  if (el) el.value = value ?? '';
+}
+function _getValueInput(vt) {
+  const el = document.getElementById('fc_val_' + vt);
+  return el ? parseFloat(el.value) : NaN;
+}
+
+// Parse legacy "MM/DD/YY" strings emitted by the old form into Date. "25"
+// → 2025, "99" → 1999 (pre-2000 fallback so test fixtures remain stable).
+function _parseMMDDYY(s) {
+  if (!s) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(s);
+  if (!m) return null;
+  const yy = parseInt(m[3], 10);
+  const fullYear = yy + (yy >= 70 ? 1900 : 2000);
+  return new Date(fullYear, parseInt(m[1],10) - 1, parseInt(m[2],10));
+}
+function _mmddyy(d) {
+  return (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + String(d.getFullYear()).slice(2);
+}
+
+function openAddConcForm() {
+  editingConcessionId = null;
+  const t = document.getElementById('addConcFormTitle');
+  if (t) t.textContent = selectedMgmtUnitId ? 'New Unit-Specific Concession' : 'New Concession';
+  const sl = document.getElementById('saveConcBtnLabel');
+  if (sl) sl.textContent = 'Save Concession';
+
+  const fp = document.getElementById('fc_priority');  if (fp) fp.value = selectedMgmtUnitId ? '5' : '1';
+  const fs = document.getElementById('fc_stackable'); if (fs) fs.checked = true;
+  const fa = document.getElementById('fc_excludeAF'); if (fa) fa.checked = false;
+  const fr = document.getElementById('fc_excludeRC'); if (fr) fr.checked = false;
+  ['flat_monthly','total_dollar','pct_monthly_rent'].forEach(id => _setValueInput(id, ''));
+
+  setConcValueType('flat_monthly');
+  setConcApplyTo('net_eff');
+  setLeaseType(2);
+
+  selectedConcTerms = new Set(getAvailableTermsForScope(selectedMgmtCommId, selectedMgmtBedType));
+  _renderTermPills();
+  _initConcFormPickers(null, null);
+
+  const m = document.getElementById('concEditMeta'); if (m) m.remove();
+  const form = document.getElementById('addConcForm');
+  if (form) { form.style.display = 'block'; form.scrollIntoView({behavior:'smooth'}); }
+}
+
+function editMgmtConc(id) {
+  editingConcessionId = id;
+  const comm = CONCESSIONS_DATA.find(c => c.id === selectedMgmtCommId);
+  const bt = selectedMgmtBedType ? comm?.bedTypes.find(b => b.type === selectedMgmtBedType) : null;
+  const concs = selectedMgmtUnitId
+    ? (bt?.units.find(u => u.id === selectedMgmtUnitId)?.concessions ?? [])
+    : (bt ? bt.btConcessions : (comm?.commConcessions ?? []));
+  const conc = concs.find(c => c.id === id);
+  if (!conc) return;
+
+  document.getElementById('addConcFormTitle').textContent = 'Edit Concession';
+  document.getElementById('saveConcBtnLabel').textContent = 'Update';
+
+  const fp = document.getElementById('fc_priority');  if (fp) fp.value = conc.priority ?? 1;
+  const fs = document.getElementById('fc_stackable'); if (fs) fs.checked = !!conc.stackable;
+  const fa = document.getElementById('fc_excludeAF'); if (fa) fa.checked = !!conc.excludeAffordable;
+  const fr = document.getElementById('fc_excludeRC'); if (fr) fr.checked = !!conc.excludeRC;
+
+  const vt = ['flat_monthly','total_dollar','pct_monthly_rent'].includes(conc.valueType) ? conc.valueType : 'flat_monthly';
+  ['flat_monthly','total_dollar','pct_monthly_rent'].forEach(id => _setValueInput(id, ''));
+  _setValueInput(vt, conc.value);
+  setConcValueType(vt);
+
+  setConcApplyTo(conc.applyTo === 'gross' ? 'gross' : 'net_eff');
+  setLeaseType(conc.leaseType === 'New Lease' ? 0 : conc.leaseType === 'Renewal' ? 1 : 2);
+
+  const available = getAvailableTermsForScope(selectedMgmtCommId, selectedMgmtBedType);
+  const scoped = Array.isArray(conc.applicableLeaseTerms) && conc.applicableLeaseTerms.length > 0
+    ? conc.applicableLeaseTerms.filter(m => available.includes(m))
+    : available;
+  selectedConcTerms = new Set(scoped);
+  _renderTermPills();
+
+  _initConcFormPickers(_parseMMDDYY(conc.startDate), _parseMMDDYY(conc.endDate));
+
+  const form = document.getElementById('addConcForm');
+  form.style.display = 'block';
+  const card = form.querySelector('div[style*="background:var(--body-bg)"]') || form.firstElementChild;
+  let meta = document.getElementById('concEditMeta');
+  if (!meta) {
+    meta = document.createElement('div');
+    meta.id = 'concEditMeta';
+    meta.style.cssText = 'margin-top:12px;padding:10px 14px;background:var(--body-bg);border-radius:6px;border:1px solid var(--border);font-size:11.5px;color:var(--text-secondary);';
+    if (card) card.appendChild(meta);
+  }
+  meta.innerHTML = `Created by <strong>${conc.createdBy ?? 'Unknown'}</strong>${conc.createdAt ? ' on ' + conc.createdAt : ''}${conc.editedBy ? ` &middot; Last edited by <strong>${conc.editedBy}</strong>${conc.editedAt ? ' on ' + conc.editedAt : ''}` : ''}`;
+  form.scrollIntoView({behavior:'smooth'});
+}
+
+function cancelConcForm() {
+  editingConcessionId = null;
+  const form = document.getElementById('addConcForm');
+  if (form) form.style.display = 'none';
+  const m = document.getElementById('concEditMeta'); if (m) m.remove();
+}
+
+function _gatherFormFields() {
+  const vt = selectedConcValueType;
+  const value = _getValueInput(vt);
+  if (isNaN(value) || value <= 0) { alert('Please enter a valid amount.'); return null; }
+  if (vt === 'pct_monthly_rent' && value > 100) { alert('Percent value cannot exceed 100.'); return null; }
+
+  const available = getAvailableTermsForScope(selectedMgmtCommId, selectedMgmtBedType);
+  const selected  = Array.from(selectedConcTerms).filter(m => available.includes(m)).sort((a,b)=>a-b);
+  const applicableLeaseTerms = selected.length > 0 ? selected : [...available];
+
+  const lTypes = ['New Lease','Renewal','Both'];
+  return {
+    valueType: vt, value,
+    applyTo: selectedConcApplyTo,
+    applicableLeaseTerms,
+    priority: parseInt(document.getElementById('fc_priority').value) || 1,
+    stackable: document.getElementById('fc_stackable').checked,
+    excludeAF: document.getElementById('fc_excludeAF')?.checked ?? false,
+    excludeRC: document.getElementById('fc_excludeRC')?.checked ?? false,
+    leaseType: lTypes[selectedLeaseType],
+    offerStart: _concStartPicker?.getDate() ?? null,
+    offerEnd:   _concEndPicker?.getDate()   ?? null,
+  };
+}
+
+function _computeDisplayAmount(valueType, value, baseRent, term) {
+  return concessionMonthlyImpact({ valueType, value }, baseRent, term || 12);
+}
+
+function saveMgmtConc() {
+  const f = _gatherFormFields();
+  if (!f) return;
+  const comm = CONCESSIONS_DATA.find(c => c.id === selectedMgmtCommId);
+  const bt = selectedMgmtBedType ? comm?.bedTypes.find(b => b.type === selectedMgmtBedType) : null;
+  const baseRent = bt?.recRent ?? comm?.bedTypes[0]?.recRent ?? 1800;
+  const da = _computeDisplayAmount(f.valueType, f.value, baseRent);
+  const sd = f.offerStart ? _mmddyy(f.offerStart) : _mmddyy(new Date());
+  const ed = f.offerEnd   ? _mmddyy(f.offerEnd)   : _mmddyy(new Date(Date.now() + 30 * 864e5));
+  const nowFmt = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const target = bt ? bt.btConcessions : comm.commConcessions;
+
+  const common = {
+    value: f.value, valueType: f.valueType, displayAmount: da,
+    applyTo: f.applyTo, applicableLeaseTerms: f.applicableLeaseTerms,
+    priority: f.priority, stackable: f.stackable, leaseType: f.leaseType,
+    excludeAffordable: f.excludeAF, excludeRC: f.excludeRC,
+    startDate: sd, endDate: ed, status: 'Active', monthly: true,
+  };
+  if (editingConcessionId) {
+    const idx = target.findIndex(c => c.id === editingConcessionId);
+    if (idx >= 0) {
+      target[idx] = { ...target[idx], ...common, editedBy: 'Current User', editedAt: nowFmt };
+    }
+    showToast('Concession updated');
+  } else {
+    target.push({
+      id: 'CONC-NEW-' + Date.now(),
+      level: bt ? 'bedtype' : 'community',
+      commId: selectedMgmtCommId, commName: comm.name,
+      bedType: selectedMgmtBedType, unitId: null,
+      ...common,
+      daysActive: 0, daysRemaining: 30,
+      leasesOfferedTo: 0, leasesTaken: 0, uptakeRate: 0, totalCost: 0,
+      createdBy: 'Current User', createdAt: nowFmt,
+      editedBy: null, editedAt: null, history: [],
+    });
+    showToast('Concession added');
+  }
+  cancelConcForm();
+  renderMgmtPanel();
+  renderMgmtNav(getFilteredData());
+}
+
+function saveUnitConc() {
+  const f = _gatherFormFields();
+  if (!f) return;
+  const comm = CONCESSIONS_DATA.find(c => c.id === selectedMgmtCommId);
+  const btD = comm?.bedTypes.find(b => b.type === selectedMgmtBedType);
+  const unit = btD?.units.find(u => u.id === selectedMgmtUnitId);
+  if (!unit) return;
+  const da = _computeDisplayAmount(f.valueType, f.value, unit.baseRent);
+  const sd = f.offerStart ? _mmddyy(f.offerStart) : _mmddyy(new Date());
+  const ed = f.offerEnd   ? _mmddyy(f.offerEnd)   : _mmddyy(new Date(Date.now() + 30 * 864e5));
+  const nowFmt = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+
+  const common = {
+    value: f.value, valueType: f.valueType, displayAmount: da,
+    applyTo: f.applyTo, applicableLeaseTerms: f.applicableLeaseTerms,
+    priority: f.priority, stackable: f.stackable, leaseType: f.leaseType,
+    startDate: sd, endDate: ed, status: 'Active', monthly: true,
+  };
+  if (editingConcessionId) {
+    const idx = unit.concessions.findIndex(c => c.id === editingConcessionId);
+    if (idx >= 0) {
+      unit.concessions[idx] = { ...unit.concessions[idx], ...common, editedBy: 'Current User', editedAt: nowFmt };
+    }
+    showToast('Unit concession updated');
+  } else {
+    unit.concessions.push({
+      id: 'CONC-UNIT-' + selectedMgmtUnitId + '-' + Date.now(),
+      level: 'unit',
+      commId: selectedMgmtCommId, commName: comm.name,
+      bedType: selectedMgmtBedType, unitId: selectedMgmtUnitId,
+      ...common,
+      taken: false, daysActive: 0, daysRemaining: 30,
+      daysVacant: unit.daysOnMarket ?? 0,
+      excludeAffordable: false, excludeRC: false,
+      createdBy: 'Current User', createdAt: nowFmt,
+      editedBy: null, editedAt: null, history: [],
+    });
+    showToast('Unit concession added');
+  }
+  recomputeUnitStack(unit, comm, btD);
+  cancelConcForm();
+  renderMgmtPanel();
+  renderMgmtNav(getFilteredData());
+}
+
+function toggleMgmtPause(id){const comm=CONCESSIONS_DATA.find(c=>c.id===selectedMgmtCommId);const btD=selectedMgmtBedType?comm?.bedTypes.find(b=>b.type===selectedMgmtBedType):null;
+  let concs;if(selectedMgmtUnitId&&btD){const unit=btD.units.find(u=>u.id===selectedMgmtUnitId);concs=unit?.concessions??[];}else{concs=btD?btD.btConcessions:comm?.commConcessions??[];}
+  const conc=concs.find(c=>c.id===id);if(!conc)return;conc.status=conc.status==='Paused'?'Active':'Paused';
+  if(selectedMgmtUnitId&&btD){const unit=btD.units.find(u=>u.id===selectedMgmtUnitId);if(unit)recomputeUnitStack(unit,comm,btD);}
+  renderMgmtPanel();showToast(conc.status==='Paused'?'Paused':'Resumed');}
+
+function removeMgmtConc(id){if(!confirm('Remove this concession?'))return;const comm=CONCESSIONS_DATA.find(c=>c.id===selectedMgmtCommId);const btD=selectedMgmtBedType?comm?.bedTypes.find(b=>b.type===selectedMgmtBedType):null;
+  let concs;if(selectedMgmtUnitId&&btD){const unit=btD.units.find(u=>u.id===selectedMgmtUnitId);concs=unit?.concessions??[];}else{concs=btD?btD.btConcessions:comm?.commConcessions??[];}
+  const idx=concs.findIndex(c=>c.id===id);if(idx>=0)concs.splice(idx,1);
+  if(selectedMgmtUnitId&&btD){const unit=btD.units.find(u=>u.id===selectedMgmtUnitId);if(unit)recomputeUnitStack(unit,comm,btD);}
+  renderMgmtPanel();renderMgmtNav(getFilteredData());showToast('Concession removed');}
+
+function saveAutoParams(){const comm=CONCESSIONS_DATA.find(c=>c.id===selectedMgmtCommId);const bt=selectedMgmtBedType?comm?.bedTypes.find(b=>b.type===selectedMgmtBedType):null;const params={targetCoverage:parseInt(document.getElementById('ap_coverage').value),triggerVacancyDays:parseInt(document.getElementById('ap_vacancyDays').value),defaultType:document.getElementById('ap_defaultType').value,defaultAmount:parseInt(document.getElementById('ap_defaultAmt').value),maxCap:parseInt(document.getElementById('ap_maxCap').value),expireAfterDays:parseInt(document.getElementById('ap_expireDays').value)};if(bt)bt.autoParams=params;else comm.autoParams=params;showToast('Parameters saved');}
+
+// Orchestrator
+function renderConcessionsPage(){
+  const filtered=getFilteredData();
+  document.getElementById('tableWrap').style.display=currentTab==='management'?'none':'block';
+  document.getElementById('mgmtContainer').style.display=currentTab==='management'?'flex':'none';
+  document.getElementById('kpiCards').style.display=currentTab==='overview'?'flex':'none';
+  if(currentTab==='overview'){updateKpiCards(computeKPIs(filtered));renderOverviewTable(filtered);}
+  else if(currentTab==='management'){renderManagementTab(filtered);}
+}
+
+function showToast(msg){const ex=document.getElementById('toast');if(ex)ex.remove();const el=document.createElement('div');el.id='toast';el.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;opacity:0;transition:opacity .2s;display:flex;align-items:center;gap:8px;';el.innerHTML='<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="2,7 5.5,10.5 12,3"/></svg>'+msg;document.body.appendChild(el);requestAnimationFrame(()=>{el.style.opacity='1';});setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),200);},2500);}
+
+// Modal helpers
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-backdrop').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
+
+function openCompConcessionDetail(compId){
+  const allComps=(typeof COMPETITOR_DATA!=='undefined'?COMPETITOR_DATA:[]).flatMap(c=>c.competitors);
+  const comp=allComps.find(c=>c.id===compId);if(!comp)return;
+  const windsorComm=CONCESSIONS_DATA.find(c=>c.id===comp.commId);
+  const compBaseRent=windsorComm?.bedTypes[0]?.recRent??1800;
+  const totalU=windsorComm?.allUnits.length??20;
+  const netEffDisc=comp.amount>0?parseFloat((comp.amount/compBaseRent*100).toFixed(1)):0;
+
+  document.getElementById('compDetailTitle').textContent=comp.name;
+  document.getElementById('compDetailSub').textContent=comp.commName+' \u00B7 '+comp.bedType;
+
+  const activeH=comp.history.filter(h=>h.status==='Active');
+  const totalStacked=activeH.reduce((s,h)=>s+h.amount,0);
+  const totalNEDisc=parseFloat((totalStacked/compBaseRent*100).toFixed(1));
+
+  // Windsor comparison
+  const wAvail=windsorComm?windsorComm.allUnits.filter(u=>u.status==='vacant'||u.status==='on notice'):[];
+  const wAvailWC=wAvail.filter(u=>u.hasConcession);
+  const wCov=wAvail.length>0?parseFloat((wAvailWC.length/wAvail.length*100).toFixed(1)):0;
+  const wAvgAmt=wAvailWC.length>0?Math.round(wAvailWC.reduce((s,u)=>s+u.totalConcessionAmount,0)/wAvailWC.length):0;
+  const wNEPct=wAvailWC.length>0?parseFloat((wAvailWC.reduce((s,u)=>s+u.concPctOfRent,0)/wAvailWC.length).toFixed(1)):0;
+
+  const stsCfg={'Active':{bg:'rgba(74,222,128,0.12)',c:'#15803d'},'Expired':{bg:'rgba(148,163,184,0.1)',c:'#6b7280'}};
+  const dc=(a,b)=>a>b?'#e05252':a<b?'#15803d':'var(--text-muted)';
+
+  let body=`<div style="display:flex;gap:20px;padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:14px;">
+    <div><div style="font-size:10px;color:var(--text-muted);">Coverage</div><div style="font-size:14px;font-weight:600;">${comp.unitCoverage}%</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);">Avg Amount</div><div style="font-size:14px;font-weight:600;">${comp.amount>0?'$'+comp.amount:'\u2014'}</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);">Net Eff. Disc.</div><div style="font-size:14px;font-weight:600;color:var(--accent);">${netEffDisc}%</div></div>
+    <div><div style="font-size:10px;color:var(--text-muted);">Verified</div><div style="font-size:14px;font-weight:600;">${comp.verifiedDaysAgo}d ago${comp.verifiedDaysAgo>14?' <span style="color:#f5a623;">\u26A0</span>':''}</div></div>
+  </div>`;
+
+  body+=`<table class="modal-table"><thead><tr><th>Type</th><th style="text-align:center;">Units</th><th style="text-align:center;">% Inventory</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Net Eff. Disc.</th><th>Status</th></tr></thead><tbody>`;
+  const shownH=comp.history.slice(0,3);
+  shownH.forEach(h=>{const sc=stsCfg[h.status]||stsCfg.Expired;body+=`<tr><td style="font-weight:500;">${h.type}</td><td style="text-align:center;">${Math.floor(comp.unitCoverage*totalU/100)}</td><td style="text-align:center;">${comp.unitCoverage}%</td><td style="text-align:right;font-weight:500;">${h.amount>0?'$'+h.amount:'\u2014'}</td><td style="text-align:right;color:var(--accent);">-${parseFloat((h.amount/compBaseRent*100).toFixed(1))}%</td><td><span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:${sc.bg};color:${sc.c};">${h.status}</span></td></tr>`;});
+  if(activeH.length>1)body+=`<tr style="border-top:2px solid var(--border);font-weight:600;"><td>Total Stacked</td><td></td><td></td><td style="text-align:right;">$${totalStacked}</td><td style="text-align:right;color:var(--accent);">-${totalNEDisc}%</td><td></td></tr>`;
+  body+='</tbody></table>';
+
+  body+=`<div style="margin-top:16px;padding:12px 14px;background:var(--body-bg);border-radius:8px;border:1px solid var(--border);">
+    <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">vs. Windsor \u2014 ${comp.commName}</div>
+    <div style="display:flex;gap:0;">
+      <div style="flex:1;text-align:center;padding:8px;border-right:1px solid var(--border);"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Coverage</div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Comp:</span> <span style="font-weight:600;">${comp.unitCoverage}%</span></div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Us:</span> <span style="font-weight:600;">${wCov}%</span></div><div style="font-size:11px;font-weight:600;color:${dc(comp.unitCoverage,wCov)};margin-top:2px;">${comp.unitCoverage>wCov?'\u26A0 Behind':'\u2713 Ahead'}</div></div>
+      <div style="flex:1;text-align:center;padding:8px;border-right:1px solid var(--border);"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Avg Amount</div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Comp:</span> <span style="font-weight:600;">$${comp.amount}</span></div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Us:</span> <span style="font-weight:600;">$${wAvgAmt}</span></div><div style="font-size:11px;font-weight:600;color:${dc(comp.amount,wAvgAmt)};margin-top:2px;">${comp.amount>wAvgAmt?'\u26A0 Behind':'\u2713 Ahead'}</div></div>
+      <div style="flex:1;text-align:center;padding:8px;"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Net Eff. Disc.</div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Comp:</span> <span style="font-weight:600;">${netEffDisc}%</span></div><div style="font-size:12px;"><span style="color:var(--text-secondary);">Us:</span> <span style="font-weight:600;">${wNEPct}%</span></div><div style="font-size:11px;font-weight:600;color:${dc(netEffDisc,wNEPct)};margin-top:2px;">${netEffDisc>wNEPct?'\u26A0 Behind':'\u2713 Ahead'}</div></div>
+    </div>
+  </div>`;
+
+  document.getElementById('compDetailBody').innerHTML=body;
+  openModal('compConcDetailModal');
+}
+
+populateFilters();restoreFilterState();updateClearBtn();
+const urlParams=getUrlParams();
+if(urlParams.tab==='management'){switchTab('management');if(urlParams.commId){selectedMgmtCommId=urlParams.commId;selectedMgmtBedType=urlParams.bedType??null;selectedMgmtUnitId=urlParams.unitId??null;expandedMgmtComms.add(urlParams.commId);if(urlParams.bedType)expandedMgmtBedTypes.add(urlParams.commId+'|'+urlParams.bedType);}}
+renderConcessionsPage();
+</script>
+</body>
+</html>

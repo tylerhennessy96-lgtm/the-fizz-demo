@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fizz-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8642", "--directory", "/Users/tylerhennessy/Desktop/thefizz/the-fizz"],
+      "port": 8642
+    }
+  ]
+}

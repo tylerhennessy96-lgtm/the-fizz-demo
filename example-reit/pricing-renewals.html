@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing Renewals — Dynamica SmartRents</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+</head>
+<body>
+<div class="app">
+  <nav class="topnav">
+    <a href="pricing.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartRents">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartRents</span>
+      </div>
+    </a>
+    <div class="nav-tabs">
+      <a href="pricing.html" class="nav-tab active">Pricing</a>
+      <a href="expiration.html" class="nav-tab">Expiration Management</a>
+      <a href="term.html" class="nav-tab">Term Management</a>
+      <a href="concessions.html" class="nav-tab">Concession Management</a>
+      <a href="rent-control.html" class="nav-tab">Rent Control</a>
+    </div>
+    <div class="nav-divider"></div>
+    <div style="position:relative;">
+      <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+      <div class="nav-dropdown" id="navDropdown">
+        <a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a>
+        <a href="history.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 11,10"/></svg>Lease History</a>
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="filter-bar" id="filterBar"></div>
+
+  <div class="subtab-bar">
+    <a href="pricing.html" class="subtab">New Lease</a>
+    <a href="pricing-renewals.html" class="subtab active">Renewals</a>
+    <div class="subtab-spacer"></div>
+    <button id="pushBtn" onclick="executePush()" style="display:none;align-items:center;gap:6px;padding:6px 14px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;transition:background .15s;" onmouseover="this.style.background='var(--accent-dim)'" onmouseout="this.style.background='var(--accent)'">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="7" y1="1" x2="7" y2="10"/><polyline points="3,6 7,10 11,6"/><line x1="2" y1="13" x2="12" y2="13"/></svg>
+      Push renewals
+    </button>
+    <span class="rerun-timestamp" id="rerunTimestamp">Last updated: 8:00 AM today</span>
+    <button class="btn-adv-filters btn-rerun" id="rerunBtn" onclick="rerunPricing()" style="margin-right:12px;">
+      <span id="rerunBtnIcon" style="display:inline-flex;align-items:center;">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v3h-3"/><path d="M12 6a5 5 0 1 0-1.5 3.5"/></svg>
+      </span>
+      <span id="rerunBtnLabel">Re-run pricing</span>
+    </button>
+    <button class="btn-adv-filters" onclick="toggleAdvDrawer()">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="4" x2="12" y2="4"/><line x1="4" y1="7" x2="10" y2="7"/><line x1="6" y1="10" x2="8" y2="10"/></svg>
+      Advanced filters
+    </button>
+  </div>
+
+  <div class="status-legend">
+    <span class="status-legend-item"><span style="background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">RC</span>Rent Control</span>
+    <span class="status-legend-item"><span style="background:rgba(245,166,35,0.15);color:#92400e;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">AF</span>Affordable</span>
+  </div>
+
+  <div id="renewalsStatsBar" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:0;align-items:center;flex-shrink:0;"></div>
+
+  <div class="main">
+    <div class="table-wrap" id="tableWrap">
+      <table class="data-table" id="renewalsTable">
+        <thead>
+          <tr>
+            <th style="min-width:180px;">Property<span class="th-sub">Available/total units</span></th>
+            <th style="width:50px;">RC</th>
+            <th>Lease End</th>
+            <th>Days to<br><span class="th-sub">Lease End</span></th>
+            <th>Days to<br><span class="th-sub">Offer</span></th>
+            <th>Lease ID</th>
+            <th style="text-align:right;">Att.<br><span class="th-sub">Value</span></th>
+            <th>Lease<br><span class="th-sub">Term</span></th>
+            <th>Lease Price</th>
+            <th>Concs.<br><span class="th-sub">Amt</span></th>
+            <th>Net Eff.<br><span class="th-sub">Lease Price</span></th>
+            <th>Renewal<br><span class="th-sub">Offer Price</span></th>
+            <th>Renewal<br><span class="th-sub">Offer Term</span></th>
+            <th>Renewal Price<br><span class="th-sub">Change (%)</span></th>
+            <th>Delta to New<br><span class="th-sub">Lease (%)</span></th>
+            <th>Status</th>
+            <th>Manual<br><span class="th-sub">Push</span></th>
+          </tr>
+        </thead>
+        <tbody id="renewalsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Advanced Filters Drawer -->
+    <div class="adv-drawer adv-drawer-tall" id="advDrawer">
+      <div class="adv-drawer-header">
+        <span class="adv-drawer-title">Advanced filters</span>
+        <button class="adv-close" onclick="toggleAdvDrawer()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+        </button>
+      </div>
+      <div class="adv-drawer-body">
+      <div class="adv-section" id="statusFilters">
+        <div class="adv-section-title">Renewal Status</div>
+        <label class="ms-option"><input type="checkbox" value="Pending" onchange="renderRenewalsTable()">Pending</label>
+        <label class="ms-option"><input type="checkbox" value="Offer Sent" onchange="renderRenewalsTable()">Offer Sent</label>
+        <label class="ms-option"><input type="checkbox" value="Accepted" onchange="renderRenewalsTable()">Accepted</label>
+        <label class="ms-option"><input type="checkbox" value="Declined" onchange="renderRenewalsTable()">Declined</label>
+        <label class="ms-option"><input type="checkbox" value="Negotiating" onchange="renderRenewalsTable()"><span style="display:inline-flex;align-items:center;gap:6px;"><span style="background:rgba(167,139,250,0.2);color:#6d28d9;font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;">Negotiating</span></span></label>
+      </div>
+      </div>
+      <div class="adv-footer">
+        <button class="btn-apply" onclick="renderRenewalsTable();toggleAdvDrawer()">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Att. Value Modal ── -->
+<div class="modal-backdrop" id="attValueModal">
+  <div class="modal" style="width:420px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Attribute Value Breakdown</div>
+        <div class="modal-subtitle" id="attValueModalUnit"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('attValueModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:16px;padding:10px 14px;background:var(--body-bg);border-radius:8px;border:1px solid var(--border);margin-bottom:14px;">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Floorplan</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="attFloorplan">1BR/1BA</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Area</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="attArea">750 sq ft</div>
+        </div>
+      </div>
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>Attribute</th>
+            <th>Value ($)</th>
+          </tr>
+        </thead>
+        <tbody id="attValueTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('attValueModal')">Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Community Attributes Modal ── -->
+<div class="modal-backdrop" id="commAttrModal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Community Attributes</div>
+        <div class="modal-subtitle" id="commAttrName"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('commAttrModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="commAttrFacts" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Amenities</div>
+      <div id="commAttrAmenities" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Unit Attributes</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:13px;color:var(--text-secondary);">Walk in closet</span>
+          <span style="font-size:13px;color:var(--text-secondary);">Traffic proximity</span>
+          <span style="font-size:13px;color:var(--text-secondary);">Balcony</span>
+          <span style="font-size:13px;color:var(--text-secondary);">Floor number</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('commAttrModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Renewal Term Modal -->
+<div class="modal-backdrop" id="renewalTermModal">
+  <div class="modal" style="width:90vw;max-width:90vw;max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Renewal Terms</div>
+        <div class="modal-subtitle" id="renewalTermUnit"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('renewalTermModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;overflow-y:auto;">
+      <div id="rtScrollContainer" style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;">
+        <div id="rtChartWrap" style="position:relative;height:300px;overflow:hidden;">
+          <canvas id="rtChart"></canvas>
+        </div>
+        <table id="rtHorizTable" style="table-layout:fixed;width:max-content;border-collapse:collapse;font-size:12.5px;border-top:1px solid var(--border);"></table>
+      </div>
+      <style>
+        #rtScrollContainer::-webkit-scrollbar { height:6px; }
+        #rtScrollContainer::-webkit-scrollbar-track { background:var(--border); border-radius:3px; }
+        #rtScrollContainer::-webkit-scrollbar-thumb { background:var(--accent); border-radius:3px; }
+      </style>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="closeModal('renewalTermModal')">Exit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let expandedRenewalProps = new Set();
+let expandedRenewalBedTypes = {};
+let advDrawerOpen = false;
+
+function toggleMenu(){ document.getElementById('navDropdown').classList.toggle('open'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.nav-menu-btn')&&!e.target.closest('.nav-dropdown')) document.getElementById('navDropdown').classList.remove('open'); });
+
+// Multi-Select Filters
+function buildMultiSelect(c){const w=document.createElement('div');w.className='ms-wrap';w.id='ms-'+c.id;w.innerHTML=`<button class="ms-trigger" onclick="toggleMs('${c.id}')"><span class="ms-label">${c.defaultLabel}</span><svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg></button><div class="ms-dropdown"><div class="ms-search"><input type="text" placeholder="Search..." oninput="filterMsOptions('${c.id}',this.value)"></div><div class="ms-options"><label class="ms-option ms-all"><input type="checkbox" value="__all__" checked onchange="toggleMsAll('${c.id}',this)"> All</label>${c.items.map(i=>`<label class="ms-option"><input type="checkbox" value="${i}" onchange="onMsChange('${c.id}')"> ${i}</label>`).join('')}</div></div>`;return w;}
+function toggleMs(id){document.querySelectorAll('.ms-wrap').forEach(w=>{if(w.id!=='ms-'+id)w.classList.remove('open');});document.getElementById('ms-'+id).classList.toggle('open');}
+function filterMsOptions(id,q){const lo=q.toLowerCase();document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all)').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(lo)?'':'none';});}
+function toggleMsAll(id,cb){document.querySelectorAll('#ms-'+id+' .ms-option:not(.ms-all) input').forEach(c=>c.checked=false);cb.checked=true;onMsChange(id);saveFilterState(); updateClearBtn();}
+function onMsChange(id){const w=document.getElementById('ms-'+id);const ac=w.querySelector('.ms-all input');if(![...w.querySelectorAll('.ms-option:not(.ms-all) input')].some(c=>c.checked))ac.checked=true;else ac.checked=false;updateMsLabel(id);saveFilterState(); updateClearBtn();renderRenewalsTable();}
+function getMsValues(id){const w=document.getElementById('ms-'+id);if(w.querySelector('.ms-all input').checked)return[];return[...w.querySelectorAll('.ms-option:not(.ms-all) input:checked')].map(c=>c.value);}
+function updateMsLabel(id){const w=document.getElementById('ms-'+id);const l=w.querySelector('.ms-label');const d=w.querySelector('.ms-trigger').dataset.default;const v=getMsValues(id);if(!v.length)l.textContent=d;else if(v.length<=2)l.textContent=v.join(', ');else l.textContent=v.length+' '+d.replace('All ','');}
+function saveFilterState() {
+  const state = {};
+  ['state','metro','community','rm','cd'].forEach(id => { state[id] = getMsValues(id); });
+  localStorage.setItem('smartrents_filters', JSON.stringify(state));
+}
+
+function restoreFilterState() {
+  try {
+    const saved = localStorage.getItem('smartrents_filters');
+    if (!saved) return;
+    const st = JSON.parse(saved);
+    ['state','metro','community','rm','cd'].forEach(filterId => {
+      const values = st[filterId];
+      if (!values || !values.length) return;
+      const wrap = document.getElementById('ms-' + filterId);
+      if (!wrap) return;
+      wrap.querySelectorAll('.ms-options input[type="checkbox"]').forEach(cb => {
+        if (cb.value === '__all__') return;
+        cb.checked = values.includes(cb.value);
+      });
+      const allCb = wrap.querySelector('input[value="__all__"]');
+      if (allCb) allCb.checked = false;
+      updateMsLabel(filterId);
+    });
+  } catch(e) { console.warn('Could not restore filters:', e); }
+}
+
+function clearAllFilters() {
+  ['state','metro','community','rm','cd'].forEach(filterId => {
+    const wrap = document.getElementById('ms-' + filterId);
+    if (!wrap) return;
+    wrap.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
+    const allCb = wrap.querySelector('input[value="__all__"]');
+    if (allCb) allCb.checked = true;
+    updateMsLabel(filterId);
+  });
+  localStorage.removeItem('smartrents_filters');
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.style.display = 'none';
+  renderPage();
+}
+
+function updateClearBtn() {
+  const hasFilters = ['state','metro','community','rm','cd'].some(id => getMsValues(id).length > 0);
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.style.display = hasFilters ? 'inline-block' : 'none';
+}
+
+function renderPage() { renderRenewalsTable(); }
+
+function populateFilters(){const bar=document.getElementById('filterBar');bar.innerHTML='';[{id:'state',defaultLabel:'All States',items:['Texas','Florida','Georgia','North Carolina','Virginia','Arizona','Colorado']},{id:'metro',defaultLabel:'All Metros',items:[...new Set(COMMUNITIES.map(c=>c.metro))]},{id:'community',defaultLabel:'All Communities',items:COMMUNITIES.map(c=>c.name)},{id:'rm',defaultLabel:'All Revenue Managers',items:[...new Set(COMMUNITIES.map(c=>c.rm))]},{id:'cd',defaultLabel:'All Community Directors',items:[...new Set(COMMUNITIES.map(c=>c.cd))]}].forEach(cfg=>{const el=buildMultiSelect(cfg);el.querySelector('.ms-trigger').dataset.default=cfg.defaultLabel;bar.appendChild(el);});
+  const clearBtn = document.createElement('button');
+  clearBtn.id = 'clearFiltersBtn';
+  clearBtn.onclick = clearAllFilters;
+  clearBtn.style.cssText = 'display:none;background:none;border:none;color:#6b7280;font-family:Inter,sans-serif;font-size:11.5px;cursor:pointer;padding:0 8px;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;';
+  clearBtn.textContent = 'Clear filters';
+  bar.appendChild(clearBtn);
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))document.querySelectorAll('.ms-wrap').forEach(w=>w.classList.remove('open'));});
+
+function toggleAdvDrawer(){ advDrawerOpen=!advDrawerOpen; document.getElementById('advDrawer').classList.toggle('open',advDrawerOpen); }
+
+function getSelectedStatusFilters(){ return[...document.querySelectorAll('#statusFilters input:checked')].map(c=>c.value); }
+
+// Render
+function renderRenewalsTable(){
+  const tbody=document.getElementById('renewalsBody');
+  if(!tbody)return;
+  tbody.innerHTML='';
+  if(typeof RENEWALS_DATA==='undefined')return;
+  const sf=getMsValues('state'),mf=getMsValues('metro'),cf=getMsValues('community'),rf=getMsValues('rm'),df=getMsValues('cd');
+  const statusF=getSelectedStatusFilters();
+
+  let data=RENEWALS_DATA.filter(c=>{
+    if(sf.length&&!sf.includes(c.state))return false;
+    if(mf.length&&!mf.includes(c.metro))return false;
+    if(cf.length&&!cf.includes(c.name))return false;
+    if(rf.length&&!rf.includes(c.rm))return false;
+    if(df.length&&!df.includes(c.cd))return false;
+    return true;
+  });
+
+  const stCfg={Pending:{bg:'rgba(245,166,35,0.12)',color:'#92400e'},'Offer Sent':{bg:'rgba(96,165,250,0.12)',color:'#1d4ed8'},Accepted:{bg:'rgba(74,222,128,0.12)',color:'#15803d'},Declined:{bg:'rgba(248,113,113,0.12)',color:'#b91c1c'},Negotiating:{bg:'rgba(167,139,250,0.12)',color:'#6d28d9'}};
+
+  data.forEach(comm=>{
+    const propOpen=expandedRenewalProps.has(comm.id);
+    const total=comm.bedTypes.reduce((s,bt)=>s+bt.renewalUnits.length,0);
+    const tr=document.createElement('tr');tr.className='row-property';
+    tr.innerHTML=`<td><button class="expand-btn ${propOpen?'open':''}" onclick="toggleRenewalProp('${comm.id}')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg></button><strong>${comm.name}</strong><button onclick="openCommAttrModal('${comm.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;padding:0 4px;vertical-align:middle;" title="View community attributes"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><line x1="7" y1="6" x2="7" y2="10"/><circle cx="7" cy="4.5" r=".6" fill="currentColor"/></svg></button><span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${total} renewals</span></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    tbody.appendChild(tr);
+    if(!propOpen)return;
+
+    comm.bedTypes.forEach(bt=>{
+      const btKey=comm.id+bt.type;
+      const btOpen=expandedRenewalBedTypes[btKey];
+      const btr=document.createElement('tr');btr.className='row-bedtype';
+      btr.innerHTML=`<td style="padding-left:28px;"><button class="expand-btn ${btOpen?'open':''}" onclick="toggleRenewalBedType('${btKey}')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg></button>${bt.type}<span style="font-size:11px;color:var(--text-muted);margin-left:6px;">${bt.renewalUnits.length} units</span></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+      tbody.appendChild(btr);
+      if(!btOpen)return;
+
+      const sorted=[...bt.renewalUnits].sort((a,b)=>a.leaseEndDays-b.leaseEndDays);
+      sorted.forEach(u=>{
+        if(statusF.length&&!statusF.includes(u.status))return;
+        const daysC=u.leaseEndDays<=30?'#e05252':u.leaseEndDays<=60?'#f5a623':'var(--text-primary)';
+        let dtoDisp;
+        if(u.status==='Offer Sent'||u.status==='Accepted'||u.status==='Declined'||u.status==='Negotiating'){
+          dtoDisp='<span style="color:#60a5fa;font-weight:500;">Sent</span>';
+        } else if(u.daysToOffer>0){
+          const dtc=u.daysToOffer<=7?'#f5a623':'var(--text-secondary)';
+          dtoDisp=`<span style="color:${dtc};">${u.daysToOffer}d</span>`;
+        } else if(u.daysToOffer===0){
+          dtoDisp='<span style="color:var(--accent);font-weight:700;">Now</span>';
+        } else {
+          dtoDisp='<span style="color:#e05252;font-weight:600;">Overdue</span>';
+        }
+        const sc=stCfg[u.status]||{bg:'rgba(0,0,0,0.05)',color:'var(--text-secondary)'};
+        const rpcC=u.renewalPricePct>0?'#e05252':'#15803d';
+        const dlC=u.deltaToNewLease>0?'#e05252':u.deltaToNewLease<0?'#15803d':'var(--text-muted)';
+        const isSel=selectedForPush.has(u.id);
+        const selBg=isSel?'rgba(232,0,125,0.1)':'var(--surface)';
+        const selClr=isSel?'var(--accent)':'var(--text-secondary)';
+        const selBrd=isSel?'var(--accent)':'var(--border-mid)';
+        const selTxt=isSel?'Selected':'Select';
+        const utr=document.createElement('tr');utr.className='row-unit';
+        const rcRules = typeof getActiveRcRulesForUnit === 'function' ? getActiveRcRulesForUnit(comm.id, bt.type, u.id) : [];
+        const rcBadge = rcRules.length
+          ? `<span title="${rcRules.map(r => r.name).join(' · ').replace(/"/g, '&quot;')}" style="display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;color:#64748b;font-size:9px;font-weight:700;border-radius:3px;padding:1px 4px;min-width:20px;">RC</span>`
+          : '';
+        const afBadge = u.isAffordable
+          ? `<span title="Affordable housing designation" style="display:inline-flex;align-items:center;justify-content:center;background:rgba(245,166,35,0.15);color:#92400e;font-size:9px;font-weight:700;border-radius:3px;padding:1px 4px;margin-left:6px;">AF</span>`
+          : '';
+        utr.innerHTML=`
+          <td style="padding-left:44px;font-size:12px;">${u.id}${afBadge}</td>
+          <td style="text-align:center;">${rcBadge}</td>
+          <td>${u.leaseEnd}</td>
+          <td style="color:${daysC};font-weight:500;">${u.leaseEndDays}d</td>
+          <td>${dtoDisp}</td>
+          <td style="font-size:11.5px;color:var(--text-muted);">${u.leaseId}</td>
+          <td style="text-align:right;">${u.attValue?`<button onclick="openAttValueModal('${u.id}', ${u.attValue})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12.5px;font-weight:500;text-decoration:underline;text-underline-offset:2px;padding:0;">$${u.attValue}</button>`:'<span style="color:var(--text-muted);">\u2014</span>'}</td>
+          <td style="text-align:center;">${u.leaseTerm}mo</td>
+          <td>$${u.leasePrice.toLocaleString()}</td>
+          <td style="color:var(--text-secondary);">${u.concsAmt>0?'$'+u.concsAmt:'\u2014'}</td>
+          <td>$${u.netEffLeasePrice.toLocaleString()}</td>
+          <td style="color:var(--accent);font-weight:600;">$${u.renewalOfferPrice.toLocaleString()}</td>
+          <td style="text-align:center;"><button onclick="openRenewalTermModal('${u.id}')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-weight:600;font-size:12.5px;text-decoration:underline;text-underline-offset:2px;padding:0;">${u.renewalOfferTerm}mo</button></td>
+          <td style="color:${rpcC};font-weight:500;">+${u.renewalPricePct}%</td>
+          <td style="color:${dlC};font-weight:500;">${u.deltaToNewLease>0?'+':''}${u.deltaToNewLease}%</td>
+          <td><span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:${sc.bg};color:${sc.color};white-space:nowrap;">${u.status}</span></td>
+          <td style="text-align:center;"><button class="push-select-btn" id="push-${u.id}" onclick="togglePushSelect('${u.id}',this)" style="padding:3px 10px;border-radius:4px;font-size:11px;font-weight:500;font-family:'Inter',sans-serif;border:1px solid ${selBrd};background:${selBg};color:${selClr};cursor:pointer;transition:all .15s;white-space:nowrap;">${selTxt}</button></td>`;
+        tbody.appendChild(utr);
+      });
+    });
+  });
+
+  renderRenewalsStatsBar(data);
+}
+
+function toggleRenewalProp(id){if(expandedRenewalProps.has(id))expandedRenewalProps.delete(id);else expandedRenewalProps.add(id);renderRenewalsTable();}
+function toggleRenewalBedType(key){expandedRenewalBedTypes[key]=!expandedRenewalBedTypes[key];renderRenewalsTable();}
+
+// ── Stats bar ────────────────────────────────────────────
+function renderRenewalsStatsBar(filteredData) {
+  const allUnits = filteredData.flatMap(c => c.bedTypes.flatMap(bt => bt.renewalUnits));
+
+  const accepted = allUnits.filter(u => u.status === 'Accepted');
+  const avgRenewalRate = allUnits.length > 0
+    ? parseFloat((accepted.length / allUnits.length * 100).toFixed(1))
+    : 0;
+
+  const withPrices = allUnits.filter(u => u.renewalOfferPrice && u.leasePrice && u.leasePrice > 0);
+  const avgPriceChange = withPrices.length > 0
+    ? parseFloat((withPrices.reduce((s, u) => s + ((u.renewalOfferPrice - u.leasePrice) / u.leasePrice * 100), 0) / withPrices.length).toFixed(1))
+    : 0;
+
+  const withDelta = allUnits.filter(u => u.deltaToNewLease != null);
+  const avgDeltaToNew = withDelta.length > 0
+    ? parseFloat((withDelta.reduce((s, u) => s + u.deltaToNewLease, 0) / withDelta.length).toFixed(1))
+    : 0;
+
+  const stats = [
+    { label: 'Avg. Renewal Rate', value: avgRenewalRate + '%',
+      color: avgRenewalRate > 60 ? '#15803d' : avgRenewalRate > 40 ? '#92400e' : '#e05252' },
+    { label: 'Avg. Price Change (Net Eff.)', value: (avgPriceChange >= 0 ? '+' : '') + avgPriceChange + '%',
+      color: avgPriceChange >= 0 ? '#15803d' : '#e05252' },
+    { label: 'Avg. Delta to New Lease', value: (avgDeltaToNew >= 0 ? '+' : '') + avgDeltaToNew + '%',
+      color: avgDeltaToNew >= 0 ? '#15803d' : '#e05252' },
+  ];
+
+  const el = document.getElementById('renewalsStatsBar');
+  if (!el) return;
+  el.innerHTML = stats.map((s, i) => `
+    ${i > 0 ? '<div style="width:1px;height:24px;background:var(--border);flex-shrink:0;"></div>' : ''}
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0 20px;flex-shrink:0;">
+      <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;margin-bottom:1px;">${s.label}</div>
+      <div style="font-size:13px;font-weight:700;color:${s.color};white-space:nowrap;">${s.value}</div>
+    </div>
+  `).join('');
+}
+
+const selectedForPush = new Set();
+
+function togglePushSelect(unitId, btn) {
+  if (selectedForPush.has(unitId)) {
+    selectedForPush.delete(unitId);
+    btn.textContent='Select'; btn.style.background='var(--surface)'; btn.style.color='var(--text-secondary)'; btn.style.borderColor='var(--border-mid)';
+  } else {
+    selectedForPush.add(unitId);
+    btn.textContent='Selected'; btn.style.background='rgba(232,0,125,0.1)'; btn.style.color='var(--accent)'; btn.style.borderColor='var(--accent)';
+  }
+  updatePushButton();
+}
+
+function updatePushButton() {
+  const btn=document.getElementById('pushBtn');
+  const count=selectedForPush.size;
+  if(count>0){ btn.style.display='inline-flex'; btn.innerHTML='<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="7" y1="1" x2="7" y2="10"/><polyline points="3,6 7,10 11,6"/><line x1="2" y1="13" x2="12" y2="13"/></svg>Push '+count+' renewal'+(count>1?'s':''); }
+  else{ btn.style.display='none'; }
+}
+
+function executePush() {
+  const count=selectedForPush.size;
+  RENEWALS_DATA.forEach(c=>c.bedTypes.forEach(bt=>bt.renewalUnits.forEach(u=>{
+    if(selectedForPush.has(u.id)){ u.status='Offer Sent'; u.daysToOffer=-1; }
+  })));
+  selectedForPush.clear();
+  renderRenewalsTable();
+  updatePushButton();
+  showToast(count+' renewal offer'+(count>1?'s':'')+' pushed successfully');
+}
+
+function showToast(message) {
+  const existing=document.getElementById('toast'); if(existing)existing.remove();
+  const el=document.createElement('div'); el.id='toast';
+  el.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1d23;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;border:1px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;opacity:0;transition:opacity .2s;display:flex;align-items:center;gap:8px;';
+  el.innerHTML='<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="2,7 5.5,10.5 12,3"/></svg>'+message;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>{el.style.opacity='1';});
+  setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),200);},2500);
+}
+
+// Modal
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-backdrop').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
+
+// ── Renewal Term Modal ───────────────────────────────────
+let currentRTUnit = null;
+let rtConcessions = [];
+
+function openRenewalTermModal(unitId) {
+  let foundUnit = null, foundComm = null;
+  RENEWALS_DATA.forEach(c => c.bedTypes.forEach(bt => {
+    const u = bt.renewalUnits.find(u => u.id === unitId);
+    if (u) { foundUnit = u; foundComm = c; }
+  }));
+  if (!foundUnit) return;
+  currentRTUnit = { ...foundUnit, commId: foundComm.id };
+  document.getElementById('renewalTermUnit').textContent = unitId;
+  rebuildRenewalTermModal(currentRTUnit);
+  openModal('renewalTermModal');
+}
+
+function rebuildRenewalTermModal(unit) {
+  if (!unit) return;
+  const base = unit.leasePrice || unit.renewalOfferPrice || 1800;
+  const terms = Array.from({length: 23}, (_, i) => i + 2); // 2..24
+
+  const prices = [];
+  const concessions = [];
+  const netEffs = [];
+  terms.forEach(term => {
+    let premium = 0, conc = 0;
+    const noise = Math.floor(Math.random() * 30) - 15;
+    if (term <= 3) { premium = 350 + Math.floor(Math.random() * 50); conc = 0; }
+    else if (term <= 5) { premium = 200 + Math.floor(Math.random() * 80); conc = 0; }
+    else if (term <= 8) { premium = 60 + Math.floor(Math.random() * 40); conc = 100 + Math.floor(Math.random() * 100); }
+    else if (term <= 11) { premium = 10 + Math.floor(Math.random() * 20); conc = 100 + Math.floor(Math.random() * 100); }
+    else if (term === 12) { premium = 0; conc = 100 + Math.floor(Math.random() * 100); }
+    else if (term <= 18) { premium = -(20 + Math.floor(Math.random() * 30)); conc = 150 + Math.floor(Math.random() * 150); }
+    else { premium = -(40 + Math.floor(Math.random() * 40)); conc = 150 + Math.floor(Math.random() * 150); }
+    const price = base + premium + noise;
+    prices.push(Math.round(price));
+    concessions.push(conc);
+    netEffs.push(Math.round(price - conc));
+  });
+  rtConcessions = concessions;
+
+  // Recommended term = lowest net effective rent
+  const recTermIndex = netEffs.indexOf(Math.min(...netEffs));
+  const recTerm = terms[recTermIndex];
+
+  const moveIn = new Date();
+  const expiryLabels = terms.map(t => {
+    const exp = new Date(moveIn);
+    exp.setMonth(exp.getMonth() + t);
+    return exp.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+  });
+
+  // Tightened so the full 2–24 term range fits a 1920px viewport without
+  // horizontal scroll. Matches the same constants in pricing.html's LT modal.
+  const labelColW = 110;
+  const isWide = window.innerWidth > 1600;
+  const dataColW = isWide ? 66 : 60;
+  const recColCellBg = 'rgba(232,0,125,0.05)';
+  const recHeadBg = 'rgba(232,0,125,0.12)';
+  const neBg = 'rgba(232,0,125,0.04)';
+  const stickyLabel = `position:sticky;left:0;background:var(--surface);z-index:2;`;
+  const recHeadStyle = `background:${recHeadBg};color:var(--accent);border-top:2px solid var(--accent);`;
+
+  const thead = `
+    <thead>
+      <tr style="height:36px;">
+        <th style="${stickyLabel}width:auto;padding:8px 10px;font-size:13px;font-weight:700;color:var(--text-primary);text-align:left;border-bottom:2px solid var(--border);vertical-align:middle;">Term</th>
+        ${terms.map(t => {
+          const isRec = t === recTerm;
+          return `<th style="width:${dataColW}px;min-width:${dataColW}px;padding:7px 4px;text-align:center;font-size:13px;font-weight:700;border-bottom:2px solid var(--border);vertical-align:middle;${isRec ? recHeadStyle : 'color:var(--text-primary);'}">${t}${isRec ? '<div style="font-size:9px;color:var(--accent);font-weight:600;margin-top:1px;">★ Rec</div>' : ''}</th>`;
+        }).join('')}
+      </tr>
+      <tr style="height:36px;">
+        <th style="${stickyLabel}width:auto;padding:8px 10px;font-size:11px;color:var(--text-muted);font-weight:400;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle;">Expiry Date</th>
+        ${expiryLabels.map((l, i) => `<th style="width:${dataColW}px;min-width:${dataColW}px;padding:7px 4px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:400;border-bottom:1px solid var(--border);vertical-align:middle;${terms[i] === recTerm ? 'background:'+recColCellBg+';' : ''}">${l}</th>`).join('')}
+      </tr>
+    </thead>`;
+
+  const tbody = `
+    <tbody>
+      <tr style="height:36px;">
+        <td style="${stickyLabel}width:auto;padding:8px 10px;font-size:12.5px;font-weight:600;vertical-align:middle;">Price / mo</td>
+        ${prices.map((p, i) => `<td style="width:${dataColW}px;min-width:${dataColW}px;padding:7px 4px;text-align:center;font-size:12.5px;font-weight:600;vertical-align:middle;${terms[i] === recTerm ? 'background:'+recColCellBg+';' : ''}">$${p.toLocaleString()}</td>`).join('')}
+      </tr>
+      <tr style="height:36px;">
+        <td style="${stickyLabel}width:auto;padding:8px 10px;font-size:12px;color:var(--accent);font-weight:500;vertical-align:middle;">Concs. Amt</td>
+        ${concessions.map((c, i) => `<td style="width:${dataColW}px;min-width:${dataColW}px;padding:7px 4px;text-align:center;font-size:12px;color:var(--accent);vertical-align:middle;${terms[i] === recTerm ? 'background:'+recColCellBg+';' : ''}">${c > 0 ? '-$' + c : '—'}</td>`).join('')}
+      </tr>
+      <tr style="height:36px;">
+        <td style="${stickyLabel}width:auto;padding:8px 10px;font-size:13px;font-weight:700;color:var(--text-primary);border-top:2px solid var(--border);background:${neBg};vertical-align:middle;">Net Eff.</td>
+        ${netEffs.map((n, i) => `<td style="width:${dataColW}px;min-width:${dataColW}px;padding:7px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--text-primary);border-top:2px solid var(--border);vertical-align:middle;background:${terms[i] === recTerm ? recColCellBg : neBg};">$${n.toLocaleString()}</td>`).join('')}
+      </tr>
+    </tbody>`;
+
+  const tableEl = document.getElementById('rtHorizTable');
+  tableEl.innerHTML = thead + tbody;
+
+  if (window.rtChartInst) window.rtChartInst.destroy();
+  setTimeout(() => {
+    const table = document.getElementById('rtHorizTable');
+    const canvas = document.getElementById('rtChart');
+    const wrap = document.getElementById('rtChartWrap');
+    if (!table || !canvas || !wrap) return;
+    const tableScrollW = table.scrollWidth || (labelColW + dataColW * terms.length);
+
+    wrap.style.width = tableScrollW + 'px';
+    wrap.style.height = '300px';
+    canvas.width = tableScrollW;
+    canvas.height = 300;
+    canvas.style.width = tableScrollW + 'px';
+    canvas.style.height = '300px';
+
+    const termLabels = terms.map(t => String(t));
+
+    window.rtChartInst = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: termLabels,
+        datasets: [
+          {
+            label: 'Gross Rent',
+            data: prices.map((p, i) => ({ x: termLabels[i], y: p })),
+            borderColor: '#e8007d',
+            backgroundColor: '#e8007d',
+            pointBackgroundColor: '#e8007d',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: false,
+          },
+          {
+            label: 'Net Effective',
+            data: netEffs.map((n, i) => ({ x: termLabels[i], y: n })),
+            borderColor: '#60a5fa',
+            backgroundColor: '#60a5fa',
+            pointBackgroundColor: '#60a5fa',
+            borderWidth: 2,
+            borderDash: [4,3],
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        animation: false,
+        responsive: false,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 0, right: 0, top: 4, bottom: 0 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, font: { family: 'Inter', size: 11 }, color: '#6b7280' } },
+          tooltip: {
+            backgroundColor: '#1a1d23',
+            borderColor: '#2a2d35',
+            borderWidth: 1,
+            titleColor: '#e5e7eb',
+            bodyColor: '#9ca3af',
+            padding: 10,
+            titleFont: { family: 'Inter', size: 12 },
+            bodyFont: { family: 'Inter', size: 11 },
+            callbacks: {
+              title: items => `Term ${items[0].label} months`,
+              label: ctx => {
+                const label = ctx.dataset.label;
+                const val = '$' + ctx.parsed.y.toLocaleString();
+                return ` ${label}: ${val}`;
+              },
+              afterBody: items => {
+                const i = items[0].dataIndex;
+                const conc = rtConcessions[i];
+                return conc > 0 ? [` Concession: -$${conc.toLocaleString()}`] : [];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'category',
+            labels: termLabels,
+            display: true,
+            offset: true,
+            bounds: 'data',
+            ticks: { display: false, align: 'center' },
+            grid: { display: true, color: '#e4e6eb', offset: true },
+            border: { display: false },
+          },
+          y: {
+            min: Math.min(...netEffs, ...prices) - 100,
+            max: Math.max(...netEffs, ...prices) + 80,
+            ticks: { color: '#6b7280', font: { family: 'Inter', size: 10 }, callback: v => '$' + v.toLocaleString() },
+            grid: { color: '#e4e6eb' },
+          }
+        }
+      }
+    });
+
+    // After chart renders, sync table label column width to actual chart plot left
+    setTimeout(() => {
+      if (!window.rtChartInst) return;
+      const actualPlotLeft = window.rtChartInst.chartArea.left;
+      document.querySelectorAll('#rtHorizTable td:first-child, #rtHorizTable th:first-child').forEach(c => {
+        c.style.width = actualPlotLeft + 'px';
+        c.style.minWidth = actualPlotLeft + 'px';
+      });
+    }, 40);
+  }, 80);
+}
+
+// ── Class Badge ───────────────────────────────────────────
+function classBadge(cls) {
+  const safeCls = (cls === 'A' || cls === 'B') ? cls : 'B';
+  const config = {
+    A: { bg: 'rgba(245,158,11,0.12)', color: '#92400e', border: 'rgba(245,158,11,0.3)' },
+    B: { bg: 'rgba(100,116,139,0.1)', color: '#475569', border: 'rgba(100,116,139,0.25)' },
+  };
+  const c = config[safeCls];
+  return `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:800;background:${c.bg};color:${c.color};border:1px solid ${c.border};flex-shrink:0;">${safeCls}</span>`;
+}
+
+// ── Amenity icons ─────────────────────────────────────────
+const AMENITY_ICONS = {
+  'Pool': '<path d="M2 10c2-3 4-3 5 0s3 3 5 0"/>',
+  'Concierge': '<circle cx="7" cy="4" r="2.5"/><path d="M2 13c0-3 2.5-5 5-5s5 2 5 5"/>',
+  'Parking Garage': '<rect x="2" y="5" width="10" height="7" rx="1"/><path d="M5 12v2M9 12v2M2 8h10"/>',
+  'Co-working Lounge': '<rect x="2" y="4" width="10" height="7" rx="1"/><line x1="5" y1="11" x2="5" y2="13"/><line x1="9" y1="11" x2="9" y2="13"/><line x1="3" y1="13" x2="11" y2="13"/>',
+  'Fitness Center': '<circle cx="4" cy="7" r="1.5"/><circle cx="10" cy="7" r="1.5"/><line x1="5.5" y1="7" x2="8.5" y2="7"/>',
+  'Pet Friendly': '<circle cx="4" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="7" cy="9" r="2.5"/>',
+  'Rooftop Deck': '<path d="M2 8l5-5 5 5"/><rect x="4" y="8" width="6" height="5"/>',
+  'EV Charging': '<path d="M8 2L5 8h4l-3 6"/><path d="M4 5h2M8 11h2"/>',
+  'Dog Park': '<path d="M4 13V8M4 8C4 5 7 3 7 3s3 2 3 5v5"/><circle cx="10" cy="5" r="1.5"/>',
+  'Package Lockers': '<rect x="2" y="4" width="10" height="8" rx="1"/><line x1="7" y1="4" x2="7" y2="12"/><circle cx="5" cy="8" r=".8" fill="currentColor"/><circle cx="9" cy="8" r=".8" fill="currentColor"/>',
+  'Business Center': '<rect x="3" y="5" width="8" height="7" rx="1"/><path d="M5 5V4a2 2 0 0 1 4 0v1"/>',
+  'Bike Storage': '<circle cx="4" cy="9" r="2.5"/><circle cx="10" cy="9" r="2.5"/><path d="M4 9l3-4 3 4"/><line x1="7" y1="5" x2="9" y2="5"/>',
+};
+
+function openCommAttrModal(commId) {
+  const comm = COMMUNITIES.find(c => c.id === commId);
+  if (!comm) return;
+  const cp = (typeof PRICING_DATA !== 'undefined') ? PRICING_DATA.find(p => p.id === commId) : null;
+  document.getElementById('commAttrName').textContent = comm.name;
+  const facts = [
+    { label: 'Class', value: classBadge(comm.class) },
+    { label: 'Year Built', value: comm.yearBuilt ?? '—' },
+    { label: 'Total Units', value: cp?.totalUnits ?? '—' },
+    { label: 'State', value: comm.state },
+    { label: 'Metro', value: comm.metro },
+    { label: 'Revenue Manager', value: comm.rm },
+  ];
+  document.getElementById('commAttrFacts').innerHTML = facts.map(f => `
+    <div style="background:var(--body-bg);border-radius:6px;border:1px solid var(--border);padding:8px 10px;">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">${f.label}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${f.value}</div>
+    </div>
+  `).join('');
+  document.getElementById('commAttrAmenities').innerHTML =
+    (comm.amenities ?? []).map(a => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(232,0,125,0.07);color:var(--accent);border:1px solid rgba(232,0,125,0.2);border-radius:20px;padding:4px 10px;font-size:12px;font-weight:500;">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">${AMENITY_ICONS[a] ?? '<circle cx="7" cy="7" r="5"/>'}</svg>
+        ${a}
+      </span>
+    `).join('');
+  openModal('commAttrModal');
+}
+
+function openAttValueModal(unitId, totalValue) {
+  document.getElementById('attValueModalUnit').textContent = unitId;
+  // Find unit in RENEWALS_DATA
+  let foundUnit = null;
+  for (const c of RENEWALS_DATA) {
+    for (const bt of c.bedTypes) {
+      const u = bt.renewalUnits.find(u => u.id === unitId);
+      if (u) { foundUnit = u; break; }
+    }
+    if (foundUnit) break;
+  }
+  document.getElementById('attFloorplan').textContent = foundUnit?.floorplan ?? '1BR/1BA';
+  document.getElementById('attArea').textContent = (foundUnit?.area ?? 750) + ' sq ft';
+  const attrs = ['Floor Premium', 'Balcony', 'Walk-in Closet', 'Traffic Proximity', 'Pool Access', 'Parking'];
+  const rawVals = attrs.map(() => Math.random());
+  const rawSum = rawVals.reduce((a, b) => a + b, 0);
+  const values = rawVals.map(v => Math.round(v / rawSum * totalValue));
+  const diff = totalValue - values.reduce((a, b) => a + b, 0);
+  values[values.length - 1] += diff;
+  const tb = document.getElementById('attValueTableBody');
+  tb.innerHTML = attrs.map((attr, i) => `
+    <tr>
+      <td>${attr}</td>
+      <td>$${values[i]}</td>
+    </tr>
+  `).join('') + `
+    <tr style="font-weight:600;border-top:2px solid var(--border);">
+      <td>Total</td>
+      <td>$${totalValue}</td>
+    </tr>
+  `;
+  openModal('attValueModal');
+}
+
+// ── Re-run Pricing ────────────────────────────────────────
+// Simulated engine re-run for renewal offers. On each pass, every renewal
+// unit has its renewalOfferPrice nudged by a small random delta (same
+// distribution as the new-lease page), then dependent percentages
+// (renewalPricePct, deltaToNewLease) recompute off the new value.
+// Session-only — no persistence across reloads.
+let _lastRunAt = null;
+
+function _formatLastRun(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const h12 = d.getHours() % 12 || 12;
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+  const time = `${h12}:${mm} ${ampm}`;
+  const sameDay = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+  if (sameDay) return `Last updated: ${time} today`;
+  if (isYesterday) return `Last updated: yesterday, ${time}`;
+  const monthShort = d.toLocaleString('en-US', { month: 'short' });
+  return `Last updated: ${monthShort} ${d.getDate()}, ${time}`;
+}
+
+function _setLastRunLabel() {
+  const el = document.getElementById('rerunTimestamp');
+  if (el) el.textContent = _formatLastRun(_lastRunAt);
+}
+
+(function _seedLastRun() {
+  const d = new Date();
+  d.setHours(8, 0, 0, 0);
+  _lastRunAt = d.toISOString();
+})();
+
+function _pickMovementPct() {
+  const r = Math.random();
+  const mag = r < 0.6 ? 1 : r < 0.9 ? 2 : 3;
+  const sign = Math.random() < 0.5 ? -1 : 1;
+  return sign * mag;
+}
+function _roundTo5(n) { return Math.round(n / 5) * 5; }
+
+function rerunPricing() {
+  const btn = document.getElementById('rerunBtn');
+  const icon = document.getElementById('rerunBtnIcon');
+  const label = document.getElementById('rerunBtnLabel');
+  if (!btn || btn.disabled) return;
+
+  btn.disabled = true;
+  if (icon) icon.innerHTML = '<span class="rerun-spinner"></span>';
+  if (label) label.textContent = 'Recomputing…';
+
+  setTimeout(() => {
+    let changedCount = 0;
+    RENEWALS_DATA.forEach(c => c.bedTypes.forEach(bt => bt.renewalUnits.forEach(u => {
+      // Renewal units don't carry the lock feature — every unit moves
+      // except the ~30% that the engine says are already optimal.
+      if (Math.random() < 0.30) return;
+      const pct = _pickMovementPct();
+      const moved = _roundTo5(u.renewalOfferPrice * (1 + pct / 100));
+      if (moved !== u.renewalOfferPrice) {
+        u.renewalOfferPrice = moved;
+        // Recompute dependent percentages off the new offer.
+        if (u.leasePrice) {
+          u.renewalPricePct = parseFloat(((moved - u.leasePrice) / u.leasePrice * 100).toFixed(1));
+        }
+        if (u.newLeasePrice) {
+          u.deltaToNewLease = parseFloat(((moved - u.newLeasePrice) / u.newLeasePrice * 100).toFixed(1));
+        }
+        changedCount++;
+      }
+    })));
+
+    _lastRunAt = new Date().toISOString();
+    _setLastRunLabel();
+
+    btn.disabled = false;
+    if (icon) icon.innerHTML = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3v3h-3"/><path d="M12 6a5 5 0 1 0-1.5 3.5"/></svg>';
+    if (label) label.textContent = 'Re-run pricing';
+
+    renderRenewalsTable();
+    showToast('Pricing updated. ' + changedCount + ' unit' + (changedCount === 1 ? '' : 's') + ' changed.');
+  }, 1500);
+}
+
+populateFilters();
+restoreFilterState();
+updateClearBtn();
+_setLastRunLabel();
+renderRenewalsTable();
+</script>
+</body>
+</html>

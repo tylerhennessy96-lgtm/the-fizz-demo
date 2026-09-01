@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Dynamica SmartGate</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <button class="burger-btn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="appDrawer">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="6"  x2="17" y2="6"/>
+        <line x1="3" y1="10" x2="17" y2="10"/>
+        <line x1="3" y1="14" x2="17" y2="14"/>
+      </svg>
+    </button>
+    <a href="index.html" style="display:flex;align-items:center;gap:8px;margin-right:32px;text-decoration:none;flex-shrink:0;">
+      <img src="engine_logo (2).png" style="height:28px;width:auto;display:block;" alt="Dynamica SmartGate">
+      <div style="display:flex;flex-direction:column;line-height:1;gap:2px;">
+        <span style="font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.18em;color:#ffffff;text-transform:uppercase;">DYNAMICA</span>
+        <span style="font-family:'Inter',sans-serif;font-size:12px;font-weight:400;letter-spacing:0.02em;color:rgba(255,255,255,0.55);">SmartGate</span>
+      </div>
+    </a>
+  </nav>
+
+  <main class="settings-page">
+    <div class="settings-header">
+      <h1 class="settings-title">Settings</h1>
+    </div>
+    <div class="settings-body">
+      <aside class="settings-sidebar" id="settingsSidebar">
+        <button class="settings-sidebar-item active" type="button" data-section="account">Account</button>
+        <button class="settings-sidebar-item"        type="button" data-section="alerts">Alerts</button>
+      </aside>
+
+      <section class="settings-content" id="settingsContent">
+        <div class="settings-card" data-section-pane="account">
+          <div class="settings-section-title">Account</div>
+          <div class="settings-section-sub">Manage your personal profile and regional preferences.</div>
+
+          <div class="settings-field">
+            <label for="setName">Name</label>
+            <input id="setName" class="settings-input" type="text" value="Demo User" />
+          </div>
+          <div class="settings-field">
+            <label for="setEmail">Email</label>
+            <input id="setEmail" class="settings-input" type="email" value="demo.user@example.com" />
+          </div>
+          <div class="settings-field">
+            <label for="setTz">Time zone</label>
+            <select id="setTz" class="settings-select">
+              <option>CET (Madrid)</option>
+              <option>CET (Berlin)</option>
+              <option>CET (Rome)</option>
+              <option>GMT (London)</option>
+              <option>EST (New York)</option>
+            </select>
+          </div>
+
+          <button class="settings-save-btn" type="button" data-save="account">Save changes</button>
+        </div>
+
+        <div class="settings-card" data-section-pane="alerts" hidden>
+          <div class="settings-section-title">Alerts</div>
+          <div class="settings-section-sub">Configure inline alerts shown on rows in the Pricing table.</div>
+          <div class="alert-config-list" id="alertConfigList"></div>
+          <button class="settings-save-btn" type="button" data-save="alerts">Save changes</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ── Slide-out drawer ── -->
+<div class="drawer-backdrop"></div>
+<aside class="drawer" id="appDrawer" aria-label="Main menu">
+  <div class="drawer-header">
+    <img src="engine_logo (2).png" alt="Dynamica">
+    <div class="drawer-brand">
+      <span class="wordmark">DYNAMICA</span>
+      <span class="sub">SmartGate</span>
+    </div>
+    <button class="drawer-close" type="button" aria-label="Close menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <line x1="4"  y1="4"  x2="14" y2="14"/>
+        <line x1="14" y1="4"  x2="4"  y2="14"/>
+      </svg>
+    </button>
+  </div>
+  <nav>
+    <ul class="drawer-menu">
+      <li>
+        <a href="index.html" class="drawer-item">
+          <span class="drawer-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2.5"  y="9"  width="3" height="6"  rx="0.8"/>
+              <rect x="7.5"  y="5"  width="3" height="10" rx="0.8"/>
+              <rect x="12.5" y="2"  width="3" height="13" rx="0.8"/>
+            </svg>
+          </span>
+          Pricing
+        </a>
+      </li>
+      <li>
+        <a href="autopilot.html" class="drawer-item">
+          <span class="drawer-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 1.8 L10.6 6.2 L15.4 6.2 L11.5 9.1 L13 13.8 L9 11 L5 13.8 L6.5 9.1 L2.6 6.2 L7.4 6.2 Z"/>
+            </svg>
+          </span>
+          Autopilot
+        </a>
+      </li>
+      <li>
+        <a href="settings.html" class="drawer-item active">
+          <span class="drawer-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="9" cy="9" r="2.2"/>
+              <path d="M9 1.6v1.7M9 14.7v1.7M16.4 9h-1.7M3.3 9H1.6M14.2 3.8l-1.2 1.2M5 13l-1.2 1.2M14.2 14.2L13 13M5 5L3.8 3.8"/>
+            </svg>
+          </span>
+          Settings
+        </a>
+      </li>
+      <li>
+        <button class="drawer-item drawer-logout" type="button">
+          <span class="drawer-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 13v1.2A1.3 1.3 0 0 1 9.7 15.5h-5.2A1.3 1.3 0 0 1 3.2 14.2V3.8A1.3 1.3 0 0 1 4.5 2.5h5.2A1.3 1.3 0 0 1 11 3.8V5"/>
+              <path d="M7.5 9h8.4"/>
+              <path d="M13.4 6.5L15.9 9 13.4 11.5"/>
+            </svg>
+          </span>
+          Log out
+        </button>
+      </li>
+    </ul>
+  </nav>
+</aside>
+<div class="logout-overlay" aria-hidden="true">
+  <div class="logout-spinner"></div>
+</div>
+
+<div class="app-toast" id="appToast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+<script>
+  (function () {
+    const content = document.getElementById('settingsContent');
+    const sidebar = document.getElementById('settingsSidebar');
+    const toast   = document.getElementById('appToast');
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+    // ── Alerts config (matches dynamica.alerts in index.html) ──
+    const ALERTS_KEY = 'dynamica.alerts';
+    const ALERT_TYPES = [
+      { id: 'lowPace',    label: 'Low pace',         desc: 'ROS vs benchmark falls below threshold',          color: '#ea580c', defaultThreshold: -15, thresholdMin: -50, thresholdMax: 50, hasThreshold: true,  unit: '%' },
+      { id: 'highDemand', label: 'High demand',      desc: 'Demand score exceeds threshold',                   color: '#2563eb', defaultThreshold:  80, thresholdMin:   0, thresholdMax: 100, hasThreshold: true, unit: '' },
+      { id: 'lowDemand',  label: 'Low demand',       desc: 'Demand score falls below threshold',               color: '#94a3b8', defaultThreshold:  25, thresholdMin:   0, thresholdMax: 100, hasThreshold: true, unit: '' },
+      { id: 'weather',    label: 'Weather warning',  desc: 'Adverse weather on a day with demand at or above', color: '#dc2626', defaultThreshold:  70, thresholdMin:   0, thresholdMax: 100, hasThreshold: true, unit: '' },
+      { id: 'capacity',   label: 'Capacity risk',    desc: 'Forecast units exceed % of park capacity',         color: '#16a34a', defaultThreshold:  95, thresholdMin:  50, thresholdMax: 100, hasThreshold: true, unit: '%' },
+      { id: 'priceInv',   label: 'Price inversion',  desc: 'OTA or Gate undercutting the direct Website price', color: '#a855f7', hasThreshold: false },
+      { id: 'outOfLine',  label: 'Out-of-line move', desc: 'Leaf price change exceeds 3× sibling median',      color: '#f59e0b', hasThreshold: false },
+    ];
+    function alertsDefault() {
+      const out = {};
+      ALERT_TYPES.forEach(t => {
+        out[t.id] = { enabled: true };
+        if (t.hasThreshold) out[t.id].threshold = t.defaultThreshold;
+      });
+      return out;
+    }
+    function loadAlerts() {
+      try {
+        const raw = localStorage.getItem(ALERTS_KEY);
+        const def = alertsDefault();
+        if (!raw) return def;
+        const parsed = JSON.parse(raw);
+        Object.keys(def).forEach(k => {
+          if (parsed[k]) {
+            if ('enabled' in parsed[k]) def[k].enabled = !!parsed[k].enabled;
+            if ('threshold' in parsed[k] && 'threshold' in def[k]) def[k].threshold = parsed[k].threshold;
+          }
+        });
+        return def;
+      } catch (e) { return alertsDefault(); }
+    }
+    function saveAlerts(cfg) { localStorage.setItem(ALERTS_KEY, JSON.stringify(cfg)); }
+
+    function populateAlerts() {
+      const cfg = loadAlerts();
+      const list = document.getElementById('alertConfigList');
+      list.innerHTML = ALERT_TYPES.map(t => {
+        const c = cfg[t.id];
+        const thresholdInput = t.hasThreshold
+          ? '<div class="settings-input-suffix alert-thresh-input">' +
+              '<input type="number" min="' + t.thresholdMin + '" max="' + t.thresholdMax + '" step="1" value="' + c.threshold + '" data-role="threshold" class="settings-input" />' +
+              (t.unit ? '<span class="settings-input-suffix-text">' + t.unit + '</span>' : '') +
+            '</div>'
+          : '<div class="alert-thresh-input" style="visibility:hidden"></div>';
+        return (
+          '<div class="alert-config-row" data-alert-id="' + t.id + '">' +
+            '<span class="alert-swatch" style="background:' + t.color + '"></span>' +
+            '<label class="switch alert-switch">' +
+              '<input type="checkbox" data-role="enabled"' + (c.enabled ? ' checked' : '') + ' />' +
+              '<span class="switch-track"><span class="switch-thumb"></span></span>' +
+            '</label>' +
+            '<div class="alert-config-text">' +
+              '<div class="alert-config-label">' + t.label + '</div>' +
+              '<div class="alert-config-desc">' + t.desc + '</div>' +
+            '</div>' +
+            thresholdInput +
+          '</div>'
+        );
+      }).join('');
+    }
+    function readAlertsForm() {
+      const out = {};
+      ALERT_TYPES.forEach(t => {
+        const row  = document.querySelector('[data-alert-id="' + t.id + '"]');
+        if (!row) return;
+        const enEl = row.querySelector('[data-role="enabled"]');
+        out[t.id] = { enabled: !!enEl.checked };
+        if (t.hasThreshold) {
+          const thEl = row.querySelector('[data-role="threshold"]');
+          const th   = parseFloat(thEl.value);
+          out[t.id].threshold = clamp(isNaN(th) ? t.defaultThreshold : th, t.thresholdMin, t.thresholdMax);
+        }
+      });
+      return out;
+    }
+
+    function showPane(key) {
+      content.querySelectorAll('[data-section-pane]').forEach(p => {
+        p.hidden = (p.dataset.sectionPane !== key);
+      });
+      if (key === 'alerts') populateAlerts();
+    }
+    sidebar.addEventListener('click', e => {
+      const btn = e.target.closest('.settings-sidebar-item');
+      if (!btn || btn.classList.contains('active')) return;
+      sidebar.querySelectorAll('.settings-sidebar-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      showPane(btn.dataset.section);
+    });
+
+    content.addEventListener('click', e => {
+      const btn = e.target.closest('[data-save]');
+      if (!btn) return;
+      const which = btn.dataset.save;
+      if (which === 'account') { showToast('Settings saved'); return; }
+      if (which === 'alerts')  { saveAlerts(readAlertsForm()); showToast('Alert settings saved'); return; }
+    });
+
+    // Initial pane from URL hash if valid
+    const initial = (location.hash || '').replace('#', '');
+    const validInitial = ['account', 'alerts'].includes(initial) ? initial : 'account';
+    if (validInitial !== 'account') {
+      sidebar.querySelectorAll('.settings-sidebar-item').forEach(b => b.classList.toggle('active', b.dataset.section === validInitial));
+    }
+    showPane(validInitial);
+  })();
+</script>
+
+</body>
+</html>
