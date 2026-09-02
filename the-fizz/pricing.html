@@ -43,6 +43,25 @@
     .lock-date-trigger.is-placeholder { color: var(--text-muted); }
     .lock-date-trigger svg { color: var(--text-muted); flex-shrink: 0; }
 
+    /* ── Sortable headers (SmartGate styling) ── */
+    .data-table thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: background .12s, color .12s;
+    }
+    .data-table thead th.sortable:hover { background: #eef0f5; color: var(--text-primary); }
+    .data-table thead th.sort-asc,
+    .data-table thead th.sort-desc { background: #e8eaf1; color: var(--text-primary); }
+    .th-inner { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+    .sort-ind {
+      display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 7px; line-height: 1; color: var(--text-muted); opacity: 0.45; flex-shrink: 0; width: 8px;
+    }
+    .sort-ind .sa-up, .sort-ind .sa-down { display: block; }
+    .sort-ind .sa-down { margin-top: 1px; }
+    th.sort-asc .sort-ind, th.sort-desc .sort-ind { opacity: 1; color: var(--accent); font-size: 10px; }
+    th.sort-asc .sort-ind .sa-down, th.sort-desc .sort-ind .sa-up { display: none; }
+
     /* ── Recommendation chip (Increase / Decrease / No change) ── */
     .rec-action-chip {
       display: inline-flex; align-items: center; gap: 3px;
@@ -245,27 +264,24 @@
     <span class="status-legend-item"><span style="background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">RC</span>Rent Control</span>
   </div>
 
-  <!-- ── Stats Bar ── -->
-  <div id="pricingStatsBar" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 20px;display:flex;gap:6px;align-items:center;flex-wrap:nowrap;overflow-x:auto;"></div>
-
   <!-- ── Main ── -->
   <div class="main">
     <div class="table-wrap" id="tableWrap">
       <table class="data-table" id="pricingTable">
         <thead>
           <tr>
-            <th style="min-width:190px;">House <span class="th-sub">Available/total beds</span></th>
-            <th>Avail. <span class="th-sub">%</span></th>
+            <th class="sortable" data-sort-key="name" data-sort-type="text" style="min-width:190px;"><span class="th-inner"><span>House <span class="th-sub">Available/total beds</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="availPct" data-sort-type="num"><span class="th-inner"><span>Avail. <span class="th-sub">%</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th style="width:42px;text-align:center;">RC</th>
             <th>Status</th>
-            <th style="width:66px;">Alerts</th>
-            <th>Bookings <span class="th-sub">% of forecast</span></th>
-            <th>Pace <span class="th-sub">vs last yr</span></th>
-            <th style="width:56px;">Demand</th>
+            <th class="sortable" data-sort-key="alertCount" data-sort-type="num" style="width:66px;"><span class="th-inner"><span>Alerts</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="pctOfFcst" data-sort-type="num"><span class="th-inner"><span>Bookings <span class="th-sub">% of forecast</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="ros" data-sort-type="num"><span class="th-inner"><span>Pace <span class="th-sub">vs last yr</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="demand" data-sort-type="num" style="width:76px;"><span class="th-inner"><span>Demand</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th>Stay <span class="th-sub">Type</span></th>
             <th style="text-align:right;">Current<br><span class="th-sub">Rate</span></th>
             <th style="text-align:right;">Rec.<br><span class="th-sub">Rate</span></th>
-            <th>Recommendation</th>
+            <th class="sortable" data-sort-key="recPct" data-sort-type="num"><span class="th-inner"><span>Recommendation</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="price-change-abs" style="width:80px;min-width:80px;padding-left:8px;padding-right:4px;">Price Change <span class="th-sub">(abs.)</span></th>
             <th class="price-change-pct" style="width:72px;min-width:72px;padding-left:4px;padding-right:8px;">Price Change <span class="th-sub">(%)</span></th>
             <th style="width:60px;">Notes</th>
@@ -820,47 +836,6 @@ function applyPctFormat(input) {
   input.value = isNaN(val) ? '' : val + '%';
 }
 
-// ── Stats Bar ─────────────────────────────────────────────
-function renderStatsBar(filteredData) {
-  const allRts = filteredData.flatMap(c => c.roomTypes);
-  const allUnits = filteredData.flatMap(c => c.roomTypes.flatMap(rt => rt.units));
-  const totalSold = allRts.reduce((s,rt) => s + rt.sold, 0);
-  const totalFcst = allRts.reduce((s,rt) => s + rt.fcst, 0);
-  const pctOfFcst = totalFcst > 0 ? Math.round(totalSold / totalFcst * 100) : 0;
-
-  const revW = allRts.reduce((s,rt) => s + rt.sold * rt.rate, 0);
-  const avgPace = revW > 0 ? Math.round(allRts.reduce((s,rt) => s + rt.ros * rt.sold * rt.rate, 0) / revW) : 0;
-
-  const avgOcc = allRts.length > 0 ? Math.round(allRts.reduce((s,rt) => s + rt.projOcc, 0) / allRts.length) : 0;
-  const lowPaceCount = allRts.filter(rt => rt.ros < alertCfg.lowPace.threshold).length;
-
-  const avgRate = allUnits.length > 0 ? scaleMoveIn(allUnits.reduce((s,u) => s + u.rate, 0) / allUnits.length) : 0;
-
-  const overrideCount = Object.keys(priceOverrides).filter(k =>
-    priceOverrides[k].absChange != null || priceOverrides[k].pctChange != null
-  ).length;
-
-  const stats = [
-    { label: 'Beds Sold', value: totalSold.toLocaleString('en-GB') + ' / ' + totalFcst.toLocaleString('en-GB'), color: 'var(--text-primary)' },
-    { label: '% of Forecast', value: pctOfFcst + '%', color: 'var(--text-primary)' },
-    { label: 'Pace vs LY', value: (avgPace > 0 ? '+' : '') + avgPace + '%', color: avgPace >= 0 ? '#15803d' : '#e05252' },
-    { label: 'Proj. Occupancy', value: avgOcc + '%', color: avgOcc > 95 ? '#15803d' : 'var(--text-primary)' },
-    { label: 'Low Pace', value: lowPaceCount + ' room type' + (lowPaceCount === 1 ? '' : 's'), color: lowPaceCount > 0 ? '#ea580c' : 'var(--text-muted)' },
-    { label: 'Avg Rate', value: fmt(avgRate), color: 'var(--text-primary)' },
-    { label: 'Rate Overrides', value: overrideCount, color: overrideCount > 0 ? 'var(--accent)' : 'var(--text-muted)' },
-  ];
-
-  const el = document.getElementById('pricingStatsBar');
-  if (!el) return;
-  el.innerHTML = stats.map((s, i) => `
-    ${i > 0 ? '<div style="width:1px;height:24px;background:var(--border);flex-shrink:0;"></div>' : ''}
-    <div style="display:flex;flex-direction:column;align-items:center;padding:0 12px;flex-shrink:0;">
-      <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;margin-bottom:1px;">${s.label}</div>
-      <div style="font-size:13px;font-weight:700;color:${s.color};white-space:nowrap;">${s.value}</div>
-    </div>
-  `).join('');
-}
-
 // ── Alerts cell ───────────────────────────────────────────
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
@@ -942,6 +917,74 @@ function unitNotesCell(unit) {
   return `<span style="display:inline-flex;align-items:center;gap:6px;">${noteCell(unit.id, unit.note)}${lockBtn}</span>`;
 }
 
+// ── Column sorting (SmartGate mechanism) ──────────────────
+const listSort = { key: null, dir: null };   // dir: 'asc' | 'desc' | null
+
+function houseSortValue(house, key) {
+  switch (key) {
+    case 'name':       return house.name;
+    case 'availPct':   return parseFloat(house.availPct);
+    case 'alertCount': {
+      const n = unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg).length;
+      return n || null;
+    }
+    case 'pctOfFcst':  return house.fcst > 0 ? house.sold / house.fcst : null;
+    case 'ros':        return house.ros;
+    case 'demand':     return house.demand;
+    case 'recPct': {
+      const units = house.roomTypes.flatMap(rt => rt.units);
+      return units.length ? units.reduce((s, u) => s + effectivePct(u), 0) / units.length : null;
+    }
+  }
+  return null;
+}
+
+// Stable sort that pushes nulls/NaNs to the bottom regardless of direction.
+function sortByKey(arr, getValue, isText) {
+  if (!listSort.key || !listSort.dir) return arr;
+  const dir = listSort.dir === 'asc' ? 1 : -1;
+  return arr
+    .map((x, i) => ({ x, i, v: getValue(x) }))
+    .sort((a, b) => {
+      const av = a.v, bv = b.v;
+      const aNull = av == null || (typeof av === 'number' && isNaN(av));
+      const bNull = bv == null || (typeof bv === 'number' && isNaN(bv));
+      if (aNull && bNull) return a.i - b.i;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      if (isText) {
+        const cmp = String(av).localeCompare(String(bv));
+        return cmp !== 0 ? cmp * dir : a.i - b.i;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return  1 * dir;
+      return a.i - b.i;
+    })
+    .map(o => o.x);
+}
+
+function syncSortHeaders() {
+  document.querySelectorAll('#pricingTable thead th.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sortKey === listSort.key && listSort.dir) {
+      th.classList.add(listSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+document.querySelector('#pricingTable thead').addEventListener('click', e => {
+  const th = e.target.closest('th.sortable');
+  if (!th) return;
+  const key = th.dataset.sortKey;
+  const firstDir = th.dataset.sortType === 'text' ? 'asc' : 'desc';   // text reads asc-first
+  const secondDir = firstDir === 'asc' ? 'desc' : 'asc';
+  if (listSort.key !== key) { listSort.key = key; listSort.dir = firstDir; }
+  else if (listSort.dir === firstDir) listSort.dir = secondDir;
+  else { listSort.key = null; listSort.dir = null; }
+  syncSortHeaders();
+  renderTableInPlace();
+});
+
 // ── Table Rendering ───────────────────────────────────────
 function renderTable() {
   const tb = document.getElementById('tableBody');
@@ -978,6 +1021,11 @@ function renderTable() {
       }
       return hasMatch;
     });
+  }
+
+  if (listSort.key && listSort.dir) {
+    const isText = listSort.key === 'name';
+    data = sortByKey(data, h => houseSortValue(h, listSort.key), isText);
   }
 
   data.forEach(house => {
@@ -1130,7 +1178,6 @@ function renderTable() {
     });
   });
 
-  renderStatsBar(data);
 }
 
 function toggleHouse(id) {

@@ -81,8 +81,9 @@
 
   <!-- ── Sub-tab Bar ── -->
   <div class="subtab-bar">
-    <span class="subtab active" style="cursor:default;">Stay type availability &amp; premiums</span>
-    <span style="font-size:11.5px;color:var(--text-muted);margin-left:14px;">Premiums are % vs Full Year Stay &middot; applied on top of the unit's base rate</span>
+    <a href="#" class="subtab active" id="stayMode-avail" onclick="setStayMode('avail');return false;">Stay type availability</a>
+    <a href="#" class="subtab" id="stayMode-prem" onclick="setStayMode('prem');return false;">Stay type premiums</a>
+    <span style="font-size:11.5px;color:var(--text-muted);margin-left:14px;" id="stayModeHint">Toggle which stay types each house and room type offers</span>
     <div class="subtab-spacer"></div>
     <button class="btn-save" id="saveBtn" onclick="saveChanges()" style="display:none;">Save</button>
   </div>
@@ -104,7 +105,19 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────
+let stayMode = 'avail';   // 'avail' | 'prem'
 let expandedHouses = new Set();
+
+function setStayMode(mode) {
+  if (mode === stayMode) return;
+  stayMode = mode;
+  document.getElementById('stayMode-avail').classList.toggle('active', mode === 'avail');
+  document.getElementById('stayMode-prem').classList.toggle('active', mode === 'prem');
+  document.getElementById('stayModeHint').textContent = mode === 'avail'
+    ? 'Toggle which stay types each house and room type offers'
+    : "Premiums are % vs Full Year Stay \u00b7 applied on top of the unit's base rate";
+  renderStayTable();
+}
 // pending changes: key = houseId:roomTypeOrNull:stayTypeId:field → value
 const stayChanges = {};
 
@@ -168,13 +181,23 @@ function stayCellHtml(scope, st) {
   const s = stayStateFor(scope, st.id);
   const isDefault = st.id === DEFAULT_STAY_TYPE;
   const scopeAttr = `data-house="${scope.houseId}" data-room="${scope.roomType || ''}" data-stay="${st.id}"`;
+
+  if (stayMode === 'avail') {
+    return `<td class="stay-cell">
+      <label class="stay-toggle" title="${isDefault ? 'Full Year Stay is always available' : 'Toggle availability'}">
+        <input type="checkbox" ${s.available ? 'checked' : ''} ${isDefault ? 'disabled' : ''} onchange="onAvailToggle(this)" ${scopeAttr}>
+        <span class="slider" ${isDefault ? 'style="opacity:.45;cursor:not-allowed;"' : ''}></span>
+      </label>
+    </td>`;
+  }
+
+  // Premiums mode — inputs only; unavailable stay types show a dash.
+  if (!s.available) {
+    return `<td class="stay-cell"><span style="color:var(--text-muted);font-size:12px;" title="Not offered — enable it on the Availability tab">\u2014</span></td>`;
+  }
   return `<td class="stay-cell">
-    <label class="stay-toggle" title="${isDefault ? 'Full Year Stay is always available' : 'Toggle availability'}">
-      <input type="checkbox" ${s.available ? 'checked' : ''} ${isDefault ? 'disabled' : ''} onchange="onAvailToggle(this)" ${scopeAttr}>
-      <span class="slider" ${isDefault ? 'style="opacity:.45;cursor:not-allowed;"' : ''}></span>
-    </label>
-    <input type="text" class="stay-prem-input${s.premChanged ? ' changed' : ''}" value="${isDefault ? '0%' : (s.premiumPct > 0 ? '+' : '') + s.premiumPct + '%'}"
-      ${(!s.available || isDefault) ? 'disabled' : ''} onchange="onPremChange(this)" onfocus="this.select()" ${scopeAttr}>
+    <input type="text" class="stay-prem-input${s.premChanged ? ' changed' : ''}" style="margin-top:0;" value="${isDefault ? '0%' : (s.premiumPct > 0 ? '+' : '') + s.premiumPct + '%'}"
+      ${isDefault ? 'disabled title="Full Year Stay is the base rate"' : ''} onchange="onPremChange(this)" onfocus="this.select()" ${scopeAttr}>
   </td>`;
 }
 
