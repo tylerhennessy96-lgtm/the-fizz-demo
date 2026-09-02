@@ -169,11 +169,11 @@ function makeRoomTypeMetrics(house, roomType) {
   const ros = Math.round((sellThrough / benchmarkSellThrough - 1) * 100 + rpick(r, -4, 4));
 
   // Demand score 0-100 → DL1..DL5
-  let dsBase = 46;
-  if (['Berlin', 'Munich', 'Utrecht'].includes(house.city)) dsBase += 14;
-  if (['Bremen', 'Prague'].includes(house.city)) dsBase -= 12;
+  let dsBase = 48;
+  if (['Berlin', 'Munich', 'Utrecht'].includes(house.city)) dsBase += 22;
+  if (['Bremen', 'Prague'].includes(house.city)) dsBase -= 14;
   if (isDouble) dsBase -= 5;
-  const demand = Math.max(6, Math.min(99, Math.round(dsBase + rpick(r, -16, 16))));
+  const demand = Math.max(6, Math.min(99, Math.round(dsBase + rpick(r, -18, 18))));
 
   // Projected occupancy at move-in (%)
   const projOcc = Math.min(100, Math.round((sellThrough / benchmarkSellThrough) * 88 + rpick(r, -4, 6)));

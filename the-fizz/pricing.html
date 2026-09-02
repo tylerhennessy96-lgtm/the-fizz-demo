@@ -240,7 +240,7 @@
   <!-- ── Status Legend ── -->
   <div class="status-legend">
     <span class="status-legend-group">Unit Status:</span>
-    <span class="status-legend-item"><span style="background:#f87171;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">VC</span>Vacant</span>
+    <span class="status-legend-item"><span style="background:#fee2e2;color:#b91c1c;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">VC</span>Vacant</span>
     <span class="status-legend-item"><span style="background:#94a3b8;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">ON</span>On Notice</span>
     <span class="status-legend-item"><span style="background:#f1f5f9;color:#64748b;font-size:8px;font-weight:700;border-radius:3px;padding:0 3px;line-height:1.4;">RC</span>Rent Control</span>
   </div>
@@ -259,7 +259,7 @@
             <th style="width:42px;text-align:center;">RC</th>
             <th>Status</th>
             <th style="width:66px;">Alerts</th>
-            <th>Bookings <span class="th-sub">sold / fcst</span></th>
+            <th>Bookings <span class="th-sub">% of forecast</span></th>
             <th>Pace <span class="th-sub">vs last yr</span></th>
             <th style="width:56px;">Demand</th>
             <th>Stay <span class="th-sub">Type</span></th>
@@ -637,10 +637,49 @@ function recActionFor(unit) {
   return 'No change';
 }
 
-function recActionChip(action, stateTag) {
+// Effective recommended % change for one unit (rejects count as no change)
+function effectivePct(unit) {
+  const rs = recStates[unit.id];
+  if (rs && rs.state === 'rejected') return 0;
+  const effRec = effectiveRec(unit);
+  return unit.rate ? Math.round((effRec - unit.rate) / unit.rate * 1000) / 10 : 0;
+}
+
+function recActionChip(action, stateTag, pct) {
   const cls  = action === 'Increase' ? 'ra-up' : action === 'Decrease' ? 'ra-down' : 'ra-flat';
   const icon = action === 'Increase' ? '\u2191' : action === 'Decrease' ? '\u2193' : '\u2014';
-  return '<span class="rec-action-chip ' + cls + '">' + icon + '&nbsp;' + action + '</span>' + (stateTag || '');
+  const pctTxt = (pct != null && action !== 'No change')
+    ? '&nbsp;' + (pct > 0 ? '+' : '') + pct + '%'
+    : '';
+  return '<span class="rec-action-chip ' + cls + '">' + icon + '&nbsp;' + action + pctTxt + '</span>' + (stateTag || '');
+}
+
+// Aggregate recommendation summary for a set of units (room type or house):
+// count of increases/decreases plus the average recommended % change.
+function recSummaryHtml(units) {
+  let up = 0, down = 0, pctSum = 0;
+  units.forEach(u => {
+    const a = recActionFor(u);
+    if (a === 'Increase') up++;
+    else if (a === 'Decrease') down++;
+    pctSum += effectivePct(u);
+  });
+  const avgPct = units.length ? Math.round(pctSum / units.length * 10) / 10 : 0;
+  if (!up && !down) return '<span style="color:var(--text-muted);font-size:12px;">\u2014</span>';
+  const parts = [];
+  if (up) parts.push('<span style="color:#166534;font-weight:600;">\u2191' + up + '</span>');
+  if (down) parts.push('<span style="color:#991b1b;font-weight:600;">\u2193' + down + '</span>');
+  const avgCls = avgPct > 0 ? '#166534' : avgPct < 0 ? '#991b1b' : 'var(--text-secondary)';
+  return '<span style="font-size:12px;white-space:nowrap;">' + parts.join(' ') +
+    ' <span style="color:' + avgCls + ';">\u00b7 avg ' + (avgPct > 0 ? '+' : '') + avgPct + '%</span></span>';
+}
+
+// Bookings cell: % of forecast, with the raw numbers alongside.
+function bookingsCellHtml(sold, fcst, onclick) {
+  const pct = fcst > 0 ? Math.round(sold / fcst * 100) : 0;
+  return '<a href="javascript:void(0)" onclick="' + onclick + '" style="color:var(--accent);text-decoration:underline;" title="' +
+    sold.toLocaleString('en-GB') + ' of ' + fcst.toLocaleString('en-GB') + ' forecast beds sold">' + pct + '%</a>' +
+    ' <span style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + sold.toLocaleString('en-GB') + '/' + fcst.toLocaleString('en-GB') + '</span>';
 }
 
 function recStateTag(unitId) {
@@ -965,10 +1004,11 @@ function renderTable() {
       </td>
       <td></td><td></td>
       <td>${alertsCellHtml(houseAlerts)}</td>
-      <td><a href="javascript:void(0)" onclick="openBookingModal({level:'house',houseId:'${house.id}'})" style="color:var(--accent);text-decoration:underline;">${house.sold.toLocaleString('en-GB')} / ${house.fcst.toLocaleString('en-GB')}</a></td>
+      <td>${bookingsCellHtml(house.sold, house.fcst, `openBookingModal({level:'house',houseId:'${house.id}'})`)}</td>
       <td>${paceCell(house.ros)}</td>
       <td>${dlBadge(house.demand)}</td>
-      <td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td>
+      <td>${recSummaryHtml(house.roomTypes.flatMap(rt => rt.units))}</td>
       <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.absChange!=null?priceOverrides[house.id].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${house.id}','house',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
       <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.pctChange!=null?priceOverrides[house.id].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${house.id}','house',{});this.blur();}" onblur="applyPctFormat(this)"></td>
       <td></td>
@@ -996,21 +1036,13 @@ function renderTable() {
         <td><span class="avail-pct" style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();toggleExposureForProp('${rtKey}','${house.name.replace(/'/g,"\\'")} &middot; ${rt.type}',${rt.rate})">${rt.availPct}%${parseFloat(rt.availPct) > 12.0 ? ' <span class="warn-icon">\u26a0</span>' : ''}</span></td>
         <td></td><td></td>
         <td>${alertsCellHtml(rtAlerts)}</td>
-        <td><a href="javascript:void(0)" onclick="openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})" style="color:var(--accent);text-decoration:underline;">${rt.sold} / ${rt.fcst}</a></td>
+        <td>${bookingsCellHtml(rt.sold, rt.fcst, `openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})`)}</td>
         <td>${paceCell(rt.ros)}</td>
         <td>${dlBadge(rt.demand)}</td>
         <td></td>
         <td style="text-align:right;color:var(--text-secondary);">${fmt(scaleMoveIn(rt.rate))}</td>
         <td style="text-align:right;">${fmt(scaleMoveIn(computeRec(rt.rec, rtKey)))}</td>
-        <td>${(() => {
-          let up = 0, down = 0;
-          rt.units.forEach(u => { const a = recActionFor(u); if (a === 'Increase') up++; else if (a === 'Decrease') down++; });
-          if (!up && !down) return '<span style="color:var(--text-muted);font-size:12px;">\u2014</span>';
-          const parts = [];
-          if (up) parts.push('<span style="color:#166534;font-weight:600;">\u2191' + up + '</span>');
-          if (down) parts.push('<span style="color:#991b1b;font-weight:600;">\u2193' + down + '</span>');
-          return '<span style="font-size:12px;">' + parts.join(' ') + '</span>';
-        })()}</td>
+        <td>${recSummaryHtml(rt.units)}</td>
         <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.absChange!=null?priceOverrides[rtKey].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyEuroFormat(this)"></td>
         <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.pctChange!=null?priceOverrides[rtKey].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyPctFormat(this)"></td>
         <td>${noteCell(rtKey, rt.note)}</td>
@@ -1042,7 +1074,7 @@ function renderTable() {
       filteredUnits.forEach(unit => {
         const utr = document.createElement('tr');
         utr.className = 'row-unit';
-        const statusCfg = { vacant: { label: 'VC', bg: '#f87171', color: '#fff' }, 'on notice': { label: 'ON', bg: '#94a3b8', color: '#fff' } };
+        const statusCfg = { vacant: { label: 'VC', bg: '#fee2e2', color: '#b91c1c' }, 'on notice': { label: 'ON', bg: '#94a3b8', color: '#fff' } };
         const sCfg = statusCfg[unit.status] || statusCfg.vacant;
         const statusBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;background:${sCfg.bg};color:${sCfg.color};font-size:9px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:1px 4px;min-width:20px;">${sCfg.label}</span>`;
         const rcRules = getActiveRcRulesForUnit(house.id, rt.type, unit.id);
@@ -1087,7 +1119,7 @@ function renderTable() {
           <td><span class="stay-link" onclick="openStayModal('${unit.id}')">Full Year</span></td>
           <td style="text-align:right;"><span onclick="openUnitRateHistory('${unit.id}')" title="View rate history" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">${fmt(rateShown)}</span></td>
           <td style="text-align:right;">${recCell}</td>
-          <td>${recActionChip(recActionFor(unit), recStateTag(unit.id) || (hasOverride ? '<span class="rec-state-tag t-overridden" title="Manual price change applied">OVR</span>' : ''))}</td>
+          <td>${recActionChip(recActionFor(unit), recStateTag(unit.id) || (hasOverride ? '<span class="rec-state-tag t-overridden" title="Manual price change applied">OVR</span>' : ''), effectivePct(unit))}</td>
           <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${ov?.absChange!=null?ov.absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${unit.id}','unit',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
           <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${ov?.pctChange!=null?ov.pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${unit.id}','unit',{});this.blur();}" onblur="applyPctFormat(this)"></td>
           <td>${unitNotesCell(unit)}</td>
