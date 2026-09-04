@@ -84,11 +84,13 @@
     .commit-btn.is-loading .commit-spinner { display: inline-block; }
     @keyframes cmtSpin { to { transform: rotate(360deg); } }
 
-    /* ── Row-select checkboxes (bulk update) ── */
-    .data-table th.col-select,
-    .data-table tbody td.col-select {
-      width: 34px; min-width: 34px;
-      padding: 4px 8px 4px 12px; text-align: center;
+    /* ── Row-select checkboxes (bulk update) ──
+       !important needed: styles.css gives th/td:first-child a 160px
+       min-width and row-level left padding at higher specificity. */
+    table.data-table th.col-select,
+    table.data-table tbody tr td.col-select {
+      width: 34px !important; min-width: 34px !important;
+      padding: 4px 8px 4px 12px !important; text-align: center;
     }
     input.row-select {
       width: 14px; height: 14px;
@@ -1458,6 +1460,32 @@ function renderTable() {
     data = sortByKey(data, h => houseSortValue(h, listSort.key), isText);
   }
 
+  // Pre-pass: apply the unit-level filters across every filtered house,
+  // expanded or not — Selection, Select-all and Accept-all work off this
+  // set, and the render loop reuses it per room type.
+  const roomTypeF  = document.getElementById('roomTypeFilter')?.value;
+  const vacantOn   = document.getElementById('statusVacant')?.checked;
+  const onNoticeOn = document.getElementById('statusOnNotice')?.checked;
+  const alertF     = document.getElementById('alertFilter')?.value;
+  const recF       = document.getElementById('recFilter')?.value;
+  const _rtFiltered = new Map();
+  data.forEach(house => house.roomTypes.forEach(rt => {
+    const rtAlertTypes = new Set(computeAlerts(rt, alertCfg).map(a => a.type));
+    const filtered = rt.units.filter(unit => {
+      if (unitIdQuery && !unit.id.toLowerCase().includes(unitIdQuery)) return false;
+      if (roomTypeF && unit.roomType !== roomTypeF) return false;
+      if (vacantOn || onNoticeOn) {
+        const ok = (vacantOn && unit.status === 'vacant') || (onNoticeOn && unit.status === 'on notice');
+        if (!ok) return false;
+      }
+      if (alertF && !rtAlertTypes.has(alertF)) return false;
+      if (recF && recActionFor(unit) !== recF) return false;
+      return true;
+    });
+    _rtFiltered.set(house.id + rt.type, filtered);
+    filtered.forEach(u => _renderedUnits.push(u));
+  }));
+
   data.forEach(house => {
     const houseOpen = expandedHouses.has(house.id);
     const houseAlerts = unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg);
@@ -1538,28 +1566,10 @@ function renderTable() {
 
       if (!rtOpen) return;
 
-      const roomTypeF = document.getElementById('roomTypeFilter')?.value;
-      const vacantOn   = document.getElementById('statusVacant')?.checked;
-      const onNoticeOn = document.getElementById('statusOnNotice')?.checked;
-      const alertF    = document.getElementById('alertFilter')?.value;
-      const recF      = document.getElementById('recFilter')?.value;
-
-      const rtAlertTypes = new Set(rtAlerts.map(a => a.type));
-      const filteredUnits = rt.units.filter(unit => {
-        if (unitIdQuery && !unit.id.toLowerCase().includes(unitIdQuery)) return false;
-        if (roomTypeF && unit.roomType !== roomTypeF) return false;
-        if (vacantOn || onNoticeOn) {
-          const ok = (vacantOn && unit.status === 'vacant') || (onNoticeOn && unit.status === 'on notice');
-          if (!ok) return false;
-        }
-        if (alertF && !rtAlertTypes.has(alertF)) return false;
-        if (recF && recActionFor(unit) !== recF) return false;
-        return true;
-      });
+      const filteredUnits = _rtFiltered.get(rtKey) || [];
 
       filteredUnits.forEach(unit => {
         const utr = document.createElement('tr');
-        _renderedUnits.push(unit);
         const rsRow = recStates[unit.id];
         utr.className = 'row-unit' + (rsRow?.state === 'accepted' ? ' row-accepted' : rsRow?.state === 'rejected' ? ' row-rejected' : rsRow?.state === 'overridden' ? ' row-overridden' : '');
         const statusCfg = { vacant: { label: 'VC', bg: '#fee2e2', color: '#b91c1c' }, 'on notice': { label: 'ON', bg: '#94a3b8', color: '#fff' } };
