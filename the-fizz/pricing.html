@@ -84,6 +84,103 @@
     .commit-btn.is-loading .commit-spinner { display: inline-block; }
     @keyframes cmtSpin { to { transform: rotate(360deg); } }
 
+    /* ── Row-select checkboxes (bulk update) ── */
+    .data-table th.col-select,
+    .data-table tbody td.col-select {
+      width: 34px; min-width: 34px;
+      padding: 4px 8px 4px 12px; text-align: center;
+    }
+    input.row-select {
+      width: 14px; height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer; vertical-align: middle;
+    }
+    tr.row-unit.row-overridden td { background: #f3f4ff; }
+    tr.row-unit.row-overridden:hover td { background: #e8eafc; }
+
+    .accept-all-btn {
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border-radius: var(--radius); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+      background: transparent; color: var(--accent); border: 1px solid var(--accent);
+      transition: background .12s, opacity .12s;
+    }
+    .accept-all-btn:hover { background: rgba(232,0,125,0.08); }
+    .accept-all-btn:disabled { opacity: 0.45; cursor: default; background: transparent; }
+
+    /* ── Bulk price update modal ── */
+    .bulk-backdrop {
+      position: fixed; inset: 0; background: rgba(26,26,46,0.55); z-index: 1200;
+      display: none; align-items: center; justify-content: center; padding: 24px;
+    }
+    .bulk-backdrop.is-open { display: flex; }
+    .bulk-modal {
+      background: var(--surface); border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.28);
+      width: 460px; max-width: calc(100vw - 48px);
+      font-family: 'Inter', sans-serif;
+    }
+    .bulk-modal-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 16px 22px 12px; border-bottom: 1px solid var(--border);
+    }
+    .bulk-modal-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .bulk-modal-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .bulk-modal-close {
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      padding: 4px; border-radius: 6px; display: inline-flex;
+    }
+    .bulk-modal-close:hover { background: #f3f4f8; color: var(--text-primary); }
+    .bulk-modal-body { padding: 16px 22px; display: flex; flex-direction: column; gap: 14px; }
+    .bulk-type-row { display: flex; gap: 10px; }
+    .bulk-type-opt {
+      flex: 1; display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--border-mid); border-radius: var(--radius);
+      padding: 9px 12px; font-size: 12.5px; font-weight: 500;
+      color: var(--text-primary); cursor: pointer;
+      transition: border-color .12s, background .12s;
+    }
+    .bulk-type-opt:hover { border-color: var(--accent); }
+    .bulk-type-opt:has(input:checked) { border-color: var(--accent); background: rgba(232,0,125,0.05); }
+    .bulk-type-opt input { accent-color: var(--accent); }
+    .bulk-value-row { display: flex; align-items: center; gap: 10px; }
+    .bulk-value-row label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+    .bulk-value-row input {
+      flex: 1; height: 34px; padding: 0 12px;
+      border: 1px solid var(--border-mid); border-radius: var(--radius);
+      font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 500;
+      color: var(--text-primary); font-variant-numeric: tabular-nums;
+    }
+    .bulk-value-row input:focus { outline: 1.5px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+    .bulk-unit { font-size: 13px; font-weight: 600; color: var(--text-secondary); width: 16px; }
+    .bulk-hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+    .bulk-hint b { color: var(--text-secondary); }
+    .bulk-preview { display: flex; flex-direction: column; gap: 4px; }
+    .bulk-preview-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 2px;
+    }
+    .bulk-preview-row {
+      display: flex; justify-content: space-between; gap: 12px;
+      font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums;
+    }
+    .bulk-preview-row b { color: var(--text-primary); }
+    .bulk-preview-more { font-size: 11px; color: var(--text-muted); font-style: italic; }
+    .bulk-modal-footer {
+      padding: 14px 22px 18px; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .bulk-btn-ghost, .bulk-btn-primary {
+      font-family: 'Inter', sans-serif; font-size: 12.5px; font-weight: 600;
+      padding: 8px 16px; border-radius: var(--radius); cursor: pointer;
+      transition: background .12s, opacity .12s;
+    }
+    .bulk-btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-mid); }
+    .bulk-btn-ghost:hover { background: #f3f4f8; color: var(--text-primary); }
+    .bulk-btn-primary { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+    .bulk-btn-primary:hover:not(:disabled) { background: var(--accent-dim); border-color: var(--accent-dim); }
+    .bulk-btn-primary:disabled { opacity: 0.45; cursor: default; }
+
     /* ── Sortable headers (SmartGate styling) ── */
     .data-table thead th.sortable {
       cursor: pointer;
@@ -282,6 +379,19 @@
     <span style="font-size:11.5px;color:var(--text-muted);">Booking season 2026/27 &middot; Full Year Stay rates &middot; Sep 1 move-in</span>
     <div class="subtab-spacer"></div>
     <span class="rerun-timestamp" id="rerunTimestamp">Last updated: 8:00 AM today</span>
+    <button class="accept-all-btn" id="bulkBtn" type="button" disabled style="margin-right:8px;">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2 4.5h10M2 7h10M2 9.5h6"/>
+        <path d="M10.2 8.6l1.1 1.1 2-2.2"/>
+      </svg>
+      <span class="bulk-btn-label">Bulk update (0)</span>
+    </button>
+    <button class="accept-all-btn" id="acceptAllBtn" type="button" disabled style="margin-right:8px;">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="3,7 6,10 11,4"/>
+      </svg>
+      <span class="accept-all-label">Accept all (0)</span>
+    </button>
     <button class="commit-btn" id="commitBtn" type="button" disabled style="margin-right:12px;">
       <span class="commit-spinner"></span>
       <span class="commit-label">Commit (0)</span>
@@ -309,6 +419,7 @@
       <table class="data-table" id="pricingTable">
         <thead>
           <tr>
+            <th class="col-select"><input type="checkbox" class="row-select" id="selectAllRows" aria-label="Select all visible units" title="Select all visible units"></th>
             <th class="sortable" data-sort-key="name" data-sort-type="text" style="min-width:190px;"><span class="th-inner"><span>House <span class="th-sub">Available/total beds</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="sortable" data-sort-key="occupancy" data-sort-type="num"><span class="th-inner"><span>Occupancy <span class="th-sub">%</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th style="width:42px;text-align:center;">RC</th>
@@ -599,6 +710,50 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('attValueModal')">Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bulk price update modal ── -->
+<div class="bulk-backdrop" id="bulkBackdrop" aria-hidden="true">
+  <div class="bulk-modal" role="dialog" aria-modal="true" aria-labelledby="bulkTitle">
+    <div class="bulk-modal-header">
+      <div>
+        <div class="bulk-modal-title" id="bulkTitle">Bulk price update</div>
+        <div class="bulk-modal-sub" id="bulkSub">0 units selected</div>
+      </div>
+      <button class="bulk-modal-close" type="button" id="bulkCloseBtn" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="3" x2="11" y2="11"/>
+          <line x1="11" y1="3" x2="3" y2="11"/>
+        </svg>
+      </button>
+    </div>
+    <div class="bulk-modal-body">
+      <div class="bulk-type-row" role="radiogroup" aria-label="Adjustment type">
+        <label class="bulk-type-opt">
+          <input type="radio" name="bulkType" value="pct" checked>
+          <span>Percentage (%)</span>
+        </label>
+        <label class="bulk-type-opt">
+          <input type="radio" name="bulkType" value="amt">
+          <span>Amount (&euro;)</span>
+        </label>
+      </div>
+      <div class="bulk-value-row">
+        <label for="bulkValue">Adjustment</label>
+        <input type="number" id="bulkValue" step="0.5" placeholder="e.g. 5 or -3">
+        <span class="bulk-unit" id="bulkUnit">%</span>
+      </div>
+      <div class="bulk-hint">
+        Applied to each unit's <b>current rate</b>. Positive raises, negative lowers.
+        Updated units are marked <b>Overridden</b> and queued for Commit.
+      </div>
+      <div class="bulk-preview" id="bulkPreview"></div>
+    </div>
+    <div class="bulk-modal-footer">
+      <button class="bulk-btn-ghost" type="button" id="bulkCancelBtn">Cancel</button>
+      <button class="bulk-btn-primary" type="button" id="bulkApplyBtn" disabled>Apply to 0 units</button>
     </div>
   </div>
 </div>
@@ -921,6 +1076,146 @@ function commitDecisions() {
   }, 1200);
 }
 
+// ── Bulk selection (SmartGate mechanism) ──────────────────
+const selectedUnits = new Set();
+
+function syncBulkToolbar() {
+  const bulkBtn = document.getElementById('bulkBtn');
+  if (bulkBtn) {
+    bulkBtn.querySelector('.bulk-btn-label').textContent = 'Bulk update (' + selectedUnits.size + ')';
+    bulkBtn.disabled = selectedUnits.size === 0;
+  }
+  const accBtn = document.getElementById('acceptAllBtn');
+  if (accBtn) {
+    const pending = _renderedUnits.filter(u => recActionFor(u) !== 'No change' && !recStates[u.id]?.state).length;
+    accBtn.querySelector('.accept-all-label').textContent = 'Accept all (' + pending + ')';
+    accBtn.disabled = pending === 0;
+  }
+  const selAll = document.getElementById('selectAllRows');
+  if (selAll) {
+    selAll.checked = _renderedUnits.length > 0 && _renderedUnits.every(u => selectedUnits.has(u.id));
+  }
+  refreshCommitBtn();
+}
+
+// Checkbox delegation — unit, room-type and house selectors
+document.getElementById('tableBody').addEventListener('change', e => {
+  const cb = e.target.closest('input.row-select');
+  if (!cb) return;
+  if (cb.classList.contains('unit-select')) {
+    if (cb.checked) selectedUnits.add(cb.dataset.id);
+    else selectedUnits.delete(cb.dataset.id);
+  } else if (cb.classList.contains('rt-select')) {
+    const house = PRICING_DATA.find(h => h.id === cb.dataset.house);
+    const rt = house?.roomTypes.find(r => r.type === cb.dataset.rt);
+    (rt?.units ?? []).forEach(u => { if (cb.checked) selectedUnits.add(u.id); else selectedUnits.delete(u.id); });
+  } else if (cb.classList.contains('house-select')) {
+    const house = PRICING_DATA.find(h => h.id === cb.dataset.house);
+    (house?.roomTypes ?? []).forEach(rt => rt.units.forEach(u => {
+      if (cb.checked) selectedUnits.add(u.id); else selectedUnits.delete(u.id);
+    }));
+  }
+  renderTableInPlace();
+});
+
+// ── Bulk price update modal ──
+const bulkBackdrop = document.getElementById('bulkBackdrop');
+const bulkValueEl = document.getElementById('bulkValue');
+
+function bulkType() {
+  return document.querySelector('input[name="bulkType"]:checked').value;
+}
+function bulkNewRate(unit, type, v) {
+  const raw = type === 'pct' ? unit.rate * (1 + v / 100) : unit.rate + v;
+  return Math.max(1, Math.round(raw));
+}
+function refreshBulkPreview() {
+  const v = parseFloat(bulkValueEl.value);
+  const applyBtn = document.getElementById('bulkApplyBtn');
+  const preview = document.getElementById('bulkPreview');
+  applyBtn.textContent = 'Apply to ' + selectedUnits.size + ' unit' + (selectedUnits.size === 1 ? '' : 's');
+  if (isNaN(v) || v === 0 || selectedUnits.size === 0) {
+    applyBtn.disabled = true;
+    preview.innerHTML = '';
+    return;
+  }
+  applyBtn.disabled = false;
+  const type = bulkType();
+  const sample = [...selectedUnits].slice(0, 3).map(id => {
+    const found = findUnitInPricingData(id);
+    if (!found) return '';
+    const u = found.unit;
+    return '<div class="bulk-preview-row"><span>' + esc(found.house.name) + ' \u00b7 ' + esc(id) +
+      '</span><span>' + fmt(u.rate) + ' \u2192 <b>' + fmt(bulkNewRate(u, type, v)) + '</b></span></div>';
+  }).join('');
+  const more = selectedUnits.size > 3
+    ? '<div class="bulk-preview-more">\u2026 and ' + (selectedUnits.size - 3) + ' more</div>' : '';
+  preview.innerHTML = '<div class="bulk-preview-title">Preview</div>' + sample + more;
+}
+function openBulkModal() {
+  if (!selectedUnits.size) return;
+  document.getElementById('bulkSub').textContent =
+    selectedUnits.size + ' unit' + (selectedUnits.size === 1 ? '' : 's') + ' selected';
+  bulkValueEl.value = '';
+  refreshBulkPreview();
+  bulkBackdrop.classList.add('is-open');
+  bulkBackdrop.setAttribute('aria-hidden', 'false');
+  setTimeout(() => bulkValueEl.focus(), 30);
+}
+function closeBulkModal() {
+  bulkBackdrop.classList.remove('is-open');
+  bulkBackdrop.setAttribute('aria-hidden', 'true');
+}
+document.getElementById('bulkBtn').addEventListener('click', openBulkModal);
+document.getElementById('bulkCloseBtn').addEventListener('click', closeBulkModal);
+document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
+bulkBackdrop.addEventListener('click', e => { if (e.target === bulkBackdrop) closeBulkModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && bulkBackdrop.classList.contains('is-open')) closeBulkModal();
+});
+bulkValueEl.addEventListener('input', refreshBulkPreview);
+document.querySelectorAll('input[name="bulkType"]').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('bulkUnit').textContent = bulkType() === 'pct' ? '%' : '\u20ac';
+  refreshBulkPreview();
+}));
+document.getElementById('bulkApplyBtn').addEventListener('click', () => {
+  const v = parseFloat(bulkValueEl.value);
+  if (isNaN(v) || v === 0 || !selectedUnits.size) return;
+  const type = bulkType();
+  let n = 0;
+  selectedUnits.forEach(id => {
+    const found = findUnitInPricingData(id);
+    if (!found) return;
+    recStates[id] = { state: 'overridden', overrideValue: bulkNewRate(found.unit, type, v) };
+    n++;
+  });
+  selectedUnits.clear();
+  closeBulkModal();
+  renderTableInPlace();
+  showToast(n + ' rate' + (n === 1 ? '' : 's') + ' updated (' +
+    (type === 'pct' ? (v > 0 ? '+' : '') + v + '%' : (v > 0 ? '+' : '') + '\u20ac' + v) + ')');
+});
+
+// ── Accept all visible pending recommendations ──
+document.getElementById('acceptAllBtn').addEventListener('click', () => {
+  let n = 0;
+  _renderedUnits.forEach(u => {
+    if (recActionFor(u) !== 'No change' && !recStates[u.id]?.state) {
+      recStates[u.id] = { state: 'accepted' };
+      n++;
+    }
+  });
+  renderTableInPlace();
+  showToast('Accepted ' + n + ' change' + (n === 1 ? '' : 's'));
+});
+
+// Select-all header checkbox
+document.getElementById('selectAllRows').addEventListener('change', e => {
+  if (e.target.checked) _renderedUnits.forEach(u => selectedUnits.add(u.id));
+  else _renderedUnits.forEach(u => selectedUnits.delete(u.id));
+  renderTableInPlace();
+});
+
 // ── Nav menu ──────────────────────────────────────────────
 function toggleMenu() {
   document.getElementById('navDropdown').classList.toggle('open');
@@ -1118,9 +1413,12 @@ document.querySelector('#pricingTable thead').addEventListener('click', e => {
 });
 
 // ── Table Rendering ───────────────────────────────────────
+let _renderedUnits = [];   // units passing the current filters (last render)
+
 function renderTable() {
   const tb = document.getElementById('tableBody');
   tb.innerHTML = '';
+  _renderedUnits = [];
 
   const countryF = getMsValues('country');
   const cityF = getMsValues('city');
@@ -1164,9 +1462,12 @@ function renderTable() {
     const houseOpen = expandedHouses.has(house.id);
     const houseAlerts = unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg);
 
+    const houseUnits = house.roomTypes.flatMap(rt => rt.units);
+    const houseAllSel = houseUnits.length > 0 && houseUnits.every(u => selectedUnits.has(u.id));
     const tr = document.createElement('tr');
     tr.className = 'row-property';
     tr.innerHTML = `
+      <td class="col-select"><input type="checkbox" class="row-select house-select" data-house="${house.id}" ${houseAllSel ? 'checked' : ''} aria-label="Select all units in house"></td>
       <td>
         <button class="expand-btn ${houseOpen ? 'open' : ''}" onclick="toggleHouse('${house.id}')">
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
@@ -1204,9 +1505,11 @@ function renderTable() {
       const rtOpen = expandedRoomTypes[rtKey];
       const rtAlerts = computeAlerts(rt, alertCfg);
 
+      const rtAllSel = rt.units.length > 0 && rt.units.every(u => selectedUnits.has(u.id));
       const btr = document.createElement('tr');
       btr.className = 'row-bedtype';
       btr.innerHTML = `
+        <td class="col-select"><input type="checkbox" class="row-select rt-select" data-house="${house.id}" data-rt="${rt.type}" ${rtAllSel ? 'checked' : ''} aria-label="Select all units in room type"></td>
         <td>
           <button class="expand-btn ${rtOpen ? 'open' : ''}" onclick="toggleRoomType('${rtKey}')">
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4,2 8,6 4,10"/></svg>
@@ -1256,8 +1559,9 @@ function renderTable() {
 
       filteredUnits.forEach(unit => {
         const utr = document.createElement('tr');
+        _renderedUnits.push(unit);
         const rsRow = recStates[unit.id];
-        utr.className = 'row-unit' + (rsRow?.state === 'accepted' ? ' row-accepted' : rsRow?.state === 'rejected' ? ' row-rejected' : '');
+        utr.className = 'row-unit' + (rsRow?.state === 'accepted' ? ' row-accepted' : rsRow?.state === 'rejected' ? ' row-rejected' : rsRow?.state === 'overridden' ? ' row-overridden' : '');
         const statusCfg = { vacant: { label: 'VC', bg: '#fee2e2', color: '#b91c1c' }, 'on notice': { label: 'ON', bg: '#94a3b8', color: '#fff' } };
         const sCfg = statusCfg[unit.status] || statusCfg.vacant;
         const statusBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;background:${sCfg.bg};color:${sCfg.color};font-size:9px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:1px 4px;min-width:20px;">${sCfg.label}</span>`;
@@ -1292,6 +1596,7 @@ function renderTable() {
           recCell = `<a href="javascript:void(0)" onclick="openBookingModal({level:'unit',unitId:'${unit.id}'})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">${fmt(effRecShown)}</a>`;
         }
         utr.innerHTML = `
+          <td class="col-select"><input type="checkbox" class="row-select unit-select" data-id="${unit.id}" ${selectedUnits.has(unit.id) ? 'checked' : ''} aria-label="Select unit"></td>
           <td>${unit.id}<span style="font-size:10.5px;color:var(--text-muted);margin-left:6px;">${unit.area}m\u00b2 \u00b7 Fl ${unit.floor}</span></td>
           <td></td>
           <td style="text-align:center;">${rcBadge}</td>
@@ -1319,6 +1624,7 @@ function renderTable() {
     });
   });
 
+  syncBulkToolbar();
 }
 
 function toggleHouse(id) {
