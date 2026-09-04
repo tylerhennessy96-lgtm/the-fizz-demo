@@ -480,7 +480,7 @@ let RENT_CONTROL_RULES = [
   {
     id: 'RCR-001',
     name: 'Berlin Mietpreisbremse — Kreuzberg',
-    scope: { communityIds: ['FZZ-001'], bedTypes: ['Single Studio'], unitIds: 'all' },
+    scope: { communityIds: ['FZZ-001'], bedTypes: ['Single Studio'], unitIds: ['FZZ-001-SGL-001', 'FZZ-001-SGL-003'] },
     formula: { type: 'flat_pct', value: 10 },
     ceiling: null, timeframe: '12mo', firstYearProtection: false,
     noticePeriodDays: 60, buildingAgeExemptionYears: null,
@@ -492,7 +492,7 @@ let RENT_CONTROL_RULES = [
   {
     id: 'RCR-002',
     name: 'Berlin Mietpreisbremse — Friedrichshain',
-    scope: { communityIds: ['FZZ-002'], bedTypes: ['Single Studio', 'Double Studio'], unitIds: 'all' },
+    scope: { communityIds: ['FZZ-002'], bedTypes: ['Single Studio', 'Double Studio'], unitIds: ['FZZ-002-SGL-002', 'FZZ-002-DBL-001'] },
     formula: { type: 'flat_pct', value: 10 },
     ceiling: null, timeframe: '12mo', firstYearProtection: false,
     noticePeriodDays: 60, buildingAgeExemptionYears: 12,
@@ -504,7 +504,7 @@ let RENT_CONTROL_RULES = [
   {
     id: 'RCR-003',
     name: 'Hamburg capped-increase zone',
-    scope: { communityIds: ['FZZ-003', 'FZZ-004'], bedTypes: 'all', unitIds: 'all' },
+    scope: { communityIds: ['FZZ-003', 'FZZ-004'], bedTypes: 'all', unitIds: ['FZZ-003-SGL-001', 'FZZ-003-DBL-002', 'FZZ-004-SGL-002', 'FZZ-004-SGL-003'] },
     formula: { type: 'flat_pct', value: 15 },
     ceiling: null, timeframe: '36mo', firstYearProtection: false,
     noticePeriodDays: 90, buildingAgeExemptionYears: null,
@@ -516,7 +516,7 @@ let RENT_CONTROL_RULES = [
   {
     id: 'RCR-004',
     name: 'Vienna Richtwert cap — Brigittenau',
-    scope: { communityIds: ['FZZ-010'], bedTypes: ['Single Studio'], unitIds: 'all' },
+    scope: { communityIds: ['FZZ-010'], bedTypes: ['Single Studio'], unitIds: ['FZZ-010-SGL-001', 'FZZ-010-SGL-002'] },
     formula: { type: 'cpi', cpiMultiplier: 100, cpiAddition: 0 },
     ceiling: null, timeframe: '12mo', firstYearProtection: true,
     noticePeriodDays: 30, buildingAgeExemptionYears: null,
@@ -540,7 +540,7 @@ let RENT_CONTROL_RULES = [
   {
     id: 'RCR-006',
     name: 'Munich Mietpreisbremse',
-    scope: { communityIds: ['FZZ-005'], bedTypes: 'all', unitIds: 'all' },
+    scope: { communityIds: ['FZZ-005'], bedTypes: 'all', unitIds: ['FZZ-005-SGL-002', 'FZZ-005-SGL-003', 'FZZ-005-DBL-001'] },
     formula: { type: 'flat_pct', value: 10 },
     ceiling: null, timeframe: '12mo', firstYearProtection: false,
     noticePeriodDays: 60, buildingAgeExemptionYears: 12,
