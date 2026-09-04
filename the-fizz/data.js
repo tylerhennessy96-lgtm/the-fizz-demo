@@ -218,6 +218,7 @@ function makeUnits(house, roomType, count, rtMetrics) {
       pctChange,
       floor: rpickInt(r, 1, 8),
       area: isDouble ? rpickInt(r, 45, 57) : rpickInt(r, 16, 36),
+      attValue: [40, 55, 70, 85, 100, 120][rpickInt(r, 0, 5)],
       lock: null,                // session-only price lock
       note: makeNote(r),
       priorYearRate: Math.round(rate * rpick(r, 0.93, 0.985) / 5) * 5,

@@ -318,6 +318,7 @@
             <th class="sortable" data-sort-key="ros" data-sort-type="num"><span class="th-inner"><span>Pace <span class="th-sub">vs last yr</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="sortable" data-sort-key="demand" data-sort-type="num" style="width:76px;"><span class="th-inner"><span>Demand</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th>Stay <span class="th-sub">Type</span></th>
+            <th style="width:70px;">Att. Value</th>
             <th style="text-align:right;">Current<br><span class="th-sub">Rate</span></th>
             <th style="text-align:right;">Rec.<br><span class="th-sub">Rate</span></th>
             <th class="sortable" data-sort-key="recPct" data-sort-type="num"><span class="th-inner"><span>Recommendation</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
@@ -555,6 +556,51 @@
     <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
   </div>
   <div class="calendar-days" id="calDays"></div>
+</div>
+
+<!-- ── Att. Value Modal ── -->
+<div class="modal-backdrop" id="attValueModal">
+  <div class="modal" style="width:420px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Attribute Value Breakdown</div>
+        <div class="modal-subtitle" id="attValueModalUnit"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('attValueModal')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:16px;padding:10px 14px;background:var(--body-bg);border-radius:8px;border:1px solid var(--border);margin-bottom:14px;">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Room Type</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="attRoomType">Single Studio</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Area</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="attArea">24 m&sup2;</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Floor</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="attFloor">3</div>
+        </div>
+      </div>
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>Attribute</th>
+            <th>Value (&euro;)</th>
+          </tr>
+        </thead>
+        <tbody id="attValueTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('attValueModal')">Exit</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Note Modal ── -->
@@ -1141,7 +1187,7 @@ function renderTable() {
       <td>${bookingsCellHtml(house.sold, house.fcst, `openBookingModal({level:'house',houseId:'${house.id}'})`)}</td>
       <td>${paceCell(house.ros)}</td>
       <td>${dlBadge(house.demand)}</td>
-      <td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td>
       <td>${recSummaryHtml(house.roomTypes.flatMap(rt => rt.units))}</td>
       <td></td>
       <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.absChange!=null?priceOverrides[house.id].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${house.id}','house',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
@@ -1174,6 +1220,7 @@ function renderTable() {
         <td>${bookingsCellHtml(rt.sold, rt.fcst, `openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})`)}</td>
         <td>${paceCell(rt.ros)}</td>
         <td>${dlBadge(rt.demand)}</td>
+        <td></td>
         <td></td>
         <td style="text-align:right;color:var(--text-secondary);">${fmt(scaleMoveIn(rt.rate))}</td>
         <td style="text-align:right;">${fmt(scaleMoveIn(computeRec(rt.rec, rtKey)))}</td>
@@ -1254,6 +1301,7 @@ function renderTable() {
           <td></td>
           <td></td>
           <td><span class="stay-link" onclick="openStayModal('${unit.id}')">Full Year</span></td>
+          <td class="highlight-teal">${unit.attValue ? `<a href="javascript:void(0)" onclick="openAttValueModal('${unit.id}', ${unit.attValue})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">\u20ac${unit.attValue}</a>` : ''}</td>
           <td style="text-align:right;"><span onclick="openUnitRateHistory('${unit.id}')" title="View rate history" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">${fmt(rateShown)}</span></td>
           <td style="text-align:right;">${recCell}</td>
           <td>${recActionChip(recActionFor(unit), recStateTag(unit.id) || (hasOverride ? '<span class="rec-state-tag t-overridden" title="Manual price change applied">OVR</span>' : ''), effectivePct(unit))}</td>
@@ -1809,6 +1857,41 @@ function wireBookingCurveTooltip(svg, data) {
 </script>
 
 <script>
+// ── Att. Value Modal ─────────────────────────────────────
+// Per-unit attribute premium breakdown — what the unit's monthly rate
+// carries above the room-type base. Seeded per unit so the split is
+// stable across opens.
+function openAttValueModal(unitId, totalValue) {
+  document.getElementById('attValueModalUnit').textContent = unitId;
+  const found = findUnitInPricingData(unitId);
+  const unit = found?.unit;
+  document.getElementById('attRoomType').textContent = unit?.roomType ?? '\u2014';
+  document.getElementById('attArea').textContent = (unit?.area ?? '\u2014') + ' m\u00b2';
+  document.getElementById('attFloor').textContent = unit?.floor ?? '\u2014';
+
+  const attrs = ['Floor Premium', 'Courtyard View', 'Balcony', 'Corner Studio', 'Kitchenette Upgrade', 'Quiet Side'];
+  const r = rngFor('attval|' + unitId);
+  const rawVals = attrs.map(() => r());
+  const rawSum = rawVals.reduce((a, b) => a + b, 0);
+  const values = rawVals.map(v => Math.round(v / rawSum * totalValue));
+  const diff = totalValue - values.reduce((a, b) => a + b, 0);
+  values[values.length - 1] += diff;
+
+  const tb = document.getElementById('attValueTableBody');
+  tb.innerHTML = attrs.map((attr, i) => `
+    <tr>
+      <td>${attr}</td>
+      <td>\u20ac${values[i]}</td>
+    </tr>
+  `).join('') + `
+    <tr style="font-weight:600;border-top:2px solid var(--border);">
+      <td>Total</td>
+      <td>\u20ac${totalValue}</td>
+    </tr>
+  `;
+  openModal('attValueModal');
+}
+
 // ── Occupancy & Rate Panel ────────────────────────────────
 let currentExposureBaseRate = 1200;
 
