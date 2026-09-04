@@ -317,10 +317,10 @@
             <th class="sortable" data-sort-key="pctOfFcst" data-sort-type="num"><span class="th-inner"><span>Lease Pace <span class="th-sub">% of forecast</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="sortable" data-sort-key="ros" data-sort-type="num"><span class="th-inner"><span>Pace <span class="th-sub">vs last yr</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="sortable" data-sort-key="demand" data-sort-type="num" style="width:76px;"><span class="th-inner"><span>Demand</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
-            <th>Stay <span class="th-sub">Type</span></th>
             <th style="width:70px;">Att. Value</th>
             <th style="text-align:right;">Current<br><span class="th-sub">Rate</span></th>
             <th style="text-align:right;">Rec.<br><span class="th-sub">Rate</span></th>
+            <th>Stay <span class="th-sub">Type</span></th>
             <th class="sortable" data-sort-key="recPct" data-sort-type="num"><span class="th-inner"><span>Recommendation</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th style="width:64px;">Action</th>
             <th class="price-change-abs" style="width:80px;min-width:80px;padding-left:8px;padding-right:4px;">Price Change <span class="th-sub">(abs.)</span></th>
@@ -1221,9 +1221,9 @@ function renderTable() {
         <td>${paceCell(rt.ros)}</td>
         <td>${dlBadge(rt.demand)}</td>
         <td></td>
-        <td></td>
         <td style="text-align:right;color:var(--text-secondary);">${fmt(scaleMoveIn(rt.rate))}</td>
         <td style="text-align:right;">${fmt(scaleMoveIn(computeRec(rt.rec, rtKey)))}</td>
+        <td></td>
         <td>${recSummaryHtml(rt.units)}</td>
         <td></td>
         <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.absChange!=null?priceOverrides[rtKey].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyEuroFormat(this)"></td>
@@ -1300,10 +1300,10 @@ function renderTable() {
           <td></td>
           <td></td>
           <td></td>
-          <td><span class="stay-link" onclick="openStayModal('${unit.id}')">Full Year</span></td>
           <td class="highlight-teal">${unit.attValue ? `<a href="javascript:void(0)" onclick="openAttValueModal('${unit.id}', ${unit.attValue})" style="color:var(--accent);text-decoration:underline;cursor:pointer;">\u20ac${unit.attValue}</a>` : ''}</td>
           <td style="text-align:right;"><span onclick="openUnitRateHistory('${unit.id}')" title="View rate history" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;">${fmt(rateShown)}</span></td>
           <td style="text-align:right;">${recCell}</td>
+          <td><span class="stay-link" onclick="openStayModal('${unit.id}')">Full Year</span></td>
           <td>${recActionChip(recActionFor(unit), recStateTag(unit.id) || (hasOverride ? '<span class="rec-state-tag t-overridden" title="Manual price change applied">OVR</span>' : ''), effectivePct(unit))}</td>
           <td class="action-cell"><span class="action-cell-inner">
             <button class="action-btn act-accept ${rs?.state === 'accepted' ? 'solid' : ''}" type="button" title="Accept recommendation" onclick="event.stopPropagation();toggleAcceptUnit('${unit.id}')"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,7.5 5.5,10.5 11.5,3.5"/></svg></button>

@@ -160,20 +160,27 @@ function makeRoomTypeMetrics(house, roomType) {
 
   // Season forecast for this room-type cluster; sold = confirmed to date.
   const fcst = isDouble ? rpickInt(r, 40, 90) : rpickInt(r, 90, 200);
-  const sellThrough = rpick(r, 0.35, 0.95);
+
+  // Sell-through is the single signal everything hangs off: it sets the
+  // booking curve's endpoint, pace vs benchmark, the demand level and —
+  // through the demand level — the price recommendation. City strength
+  // biases sell-through, so strong markets pace ahead and get increases.
+  let stLo = 0.40, stHi = 0.85;
+  if (['Berlin', 'Munich', 'Utrecht'].includes(house.city)) { stLo = 0.55; stHi = 0.95; }
+  if (['Bremen', 'Prague'].includes(house.city)) { stLo = 0.33; stHi = 0.72; }
+  if (isDouble) { stLo -= 0.04; stHi -= 0.04; }
+  const sellThrough = rpick(r, stLo, stHi);
   const sold = Math.round(fcst * sellThrough);
 
   // Pace vs last-year benchmark (%). Benchmark sell-through at T-108
   // days out is ~62%.
   const benchmarkSellThrough = 0.62;
-  const ros = Math.round((sellThrough / benchmarkSellThrough - 1) * 100 + rpick(r, -4, 4));
+  const ros = Math.round((sellThrough / benchmarkSellThrough - 1) * 100 + rpick(r, -3, 3));
 
-  // Demand score 0-100 → DL1..DL5
-  let dsBase = 48;
-  if (['Berlin', 'Munich', 'Utrecht'].includes(house.city)) dsBase += 22;
-  if (['Bremen', 'Prague'].includes(house.city)) dsBase -= 14;
-  if (isDouble) dsBase -= 5;
-  const demand = Math.max(6, Math.min(99, Math.round(dsBase + rpick(r, -18, 18))));
+  // Demand score derives from pace (plus mild noise) so a cluster pacing
+  // ahead of benchmark reads High/Very high and one pacing behind reads
+  // Low — never "high demand" on a curve running behind last year.
+  const demand = Math.max(6, Math.min(99, Math.round(45 + ros * 0.9 + rpick(r, -5, 5))));
 
   // Projected occupancy at move-in (%)
   const projOcc = Math.min(100, Math.round((sellThrough / benchmarkSellThrough) * 88 + rpick(r, -4, 6)));
@@ -444,13 +451,13 @@ function bookingCurveData(seedKey, sold, fcst, ros) {
       num: d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()],
     });
   }
-  const weeklyRate = Math.max(1.5, sold / 7);
-  const weekly = weekLabels.map((_, i) => {
-    const trend = 0.55 + (i / 6) * 0.9;
-    return Math.max(0, Math.round(weeklyRate * trend * (0.7 + r() * 0.7)));
-  });
+  // Weekly bookings vs benchmark follow the same pace signal as the
+  // cumulative curve: pacing ahead → most weeks beat their benchmark
+  // tick, pacing behind → most weeks fall short.
+  const weeklyRate = Math.max(1.5, benchmarkTotal / 9);
   const benchRng = rngFor('curvebench|' + seedKey);
-  const weeklyBenchmark = weekLabels.map(() => Math.max(1, Math.round(weeklyRate * (0.75 + benchRng() * 0.6))));
+  const weeklyBenchmark = weekLabels.map(() => Math.max(1, Math.round(weeklyRate * (0.8 + benchRng() * 0.4))));
+  const weekly = weeklyBenchmark.map(b => Math.max(0, Math.round(b * (1 + ros / 100) * (0.85 + r() * 0.3))));
 
   return { actualSeries, benchmarkSeries, weekly, weeklyBenchmark, weekLabels, benchmarkTotal };
 }
