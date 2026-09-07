@@ -350,6 +350,7 @@
       <a href="stay-types.html"   class="nav-tab">Stay Types</a>
       <a href="rent-control.html" class="nav-tab">Rent Control</a>
       <a href="autopilot.html"    class="nav-tab">Autopilot</a>
+      <a href="parameters.html" class="nav-tab">Parameters</a>
     </div>
 
     <div class="nav-divider"></div>
@@ -359,11 +360,6 @@
         <span></span><span></span><span></span>
       </button>
       <div class="nav-dropdown" id="navDropdown">
-        <a href="parameters.html">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
-          Parameters
-        </a>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <a href="login.html" style="color:var(--text-secondary);">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>
           Log out
@@ -378,7 +374,6 @@
 
   <!-- ── Sub-tab Bar ── -->
   <div class="subtab-bar">
-    <span style="font-size:11.5px;color:var(--text-muted);">Booking season 2026/27 &middot; Full Year Stay rates &middot; Sep 1 move-in</span>
     <div class="subtab-spacer"></div>
     <span class="rerun-timestamp" id="rerunTimestamp">Last updated: 8:00 AM today</span>
     <button class="accept-all-btn" id="bulkBtn" type="button" disabled style="margin-right:8px;">
@@ -392,7 +387,7 @@
       <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline points="3,7 6,10 11,4"/>
       </svg>
-      <span class="accept-all-label">Accept all (0)</span>
+      <span class="accept-all-label">Accept (0)</span>
     </button>
     <button class="commit-btn" id="commitBtn" type="button" disabled style="margin-right:12px;">
       <span class="commit-spinner"></span>
@@ -492,11 +487,9 @@
             <div class="exposure-charts">
               <div class="chart-box">
                 <div class="chart-label">
-                  Available beds <span style="font-size:10px;color:#6b7280;">in %</span>
+                  Vacancy <span style="font-size:10px;color:#6b7280;">in %</span>
                   <div class="chart-legend">
-                    <span class="legend-item"><span class="legend-dot" style="background:#f5a623"></span>Unsold</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#60a5fa"></span>30 Day</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#a78bfa"></span>60 Day</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#f5a623"></span>Vacancy</span>
                   </div>
                 </div>
                 <div class="chart-canvas-wrap" id="exposureChartWrap">
@@ -1089,9 +1082,8 @@ function syncBulkToolbar() {
   }
   const accBtn = document.getElementById('acceptAllBtn');
   if (accBtn) {
-    const pending = _renderedUnits.filter(u => recActionFor(u) !== 'No change' && !recStates[u.id]?.state).length;
-    accBtn.querySelector('.accept-all-label').textContent = 'Accept all (' + pending + ')';
-    accBtn.disabled = pending === 0;
+    accBtn.querySelector('.accept-all-label').textContent = 'Accept (' + selectedUnits.size + ')';
+    accBtn.disabled = selectedUnits.size === 0;
   }
   const selAll = document.getElementById('selectAllRows');
   if (selAll) {
@@ -1198,17 +1190,20 @@ document.getElementById('bulkApplyBtn').addEventListener('click', () => {
     (type === 'pct' ? (v > 0 ? '+' : '') + v + '%' : (v > 0 ? '+' : '') + '\u20ac' + v) + ')');
 });
 
-// ── Accept all visible pending recommendations ──
+// ── Accept the selected units' recommendations (selection-driven, like Bulk update) ──
 document.getElementById('acceptAllBtn').addEventListener('click', () => {
+  if (!selectedUnits.size) return;
   let n = 0;
-  _renderedUnits.forEach(u => {
-    if (recActionFor(u) !== 'No change' && !recStates[u.id]?.state) {
-      recStates[u.id] = { state: 'accepted' };
-      n++;
-    }
+  selectedUnits.forEach(id => {
+    const u = findUnit(id);
+    if (!u) return;
+    if (u.lock && u.lock.locked) return;   // locked rates aren't repriced
+    recStates[id] = { state: 'accepted' };
+    n++;
   });
+  selectedUnits.clear();
   renderTableInPlace();
-  showToast('Accepted ' + n + ' change' + (n === 1 ? '' : 's'));
+  showToast('Accepted ' + n + ' recommendation' + (n === 1 ? '' : 's'));
 });
 
 // Select-all header checkbox
@@ -2293,6 +2288,7 @@ function renderCharts(baseRate) {
   const labels = CHART_MONTHS;
   const n = labels.length;
 
+  // Single vacancy series — cyclic trend plus mean-reverting noise.
   const expData = (() => {
     const phase = Math.random() * Math.PI * 2;
     const arr = [];
@@ -2301,10 +2297,8 @@ function renderCharts(baseRate) {
       noise = noise * 0.75 + (Math.random() - 0.5) * 0.08;
       const sine = Math.sin(phase + (i / 6) * Math.PI * 2) * 0.4;
       const pressure = Math.max(0, Math.min(1, 0.5 + sine * 0.6 + noise));
-      const unsold = Math.max(0, Math.min(6, 0.8 + 4 * pressure));
-      const d30 = Math.max(0, Math.min(12, unsold + 1.5 + 3 * pressure));
-      const d60 = Math.max(2, Math.min(16, d30 + 2 + 2.5 * pressure));
-      arr.push({ vacant: +unsold.toFixed(2), exp30: +d30.toFixed(2), exp60: +d60.toFixed(2) });
+      const vacancy = Math.max(1, Math.min(14, 3 + 9 * pressure));
+      arr.push({ vacancy: +vacancy.toFixed(2) });
     }
     return arr;
   })();
@@ -2350,9 +2344,7 @@ function renderCharts(baseRate) {
     data: {
       labels,
       datasets: [
-        { label: '60 Day', data: expData.map(d => d.exp60),  borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.15)', fill: true, tension: 0, pointRadius: 0 },
-        { label: '30 Day', data: expData.map(d => d.exp30),  borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.15)', fill: true, tension: 0, pointRadius: 0 },
-        { label: 'Unsold', data: expData.map(d => d.vacant), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.25)', fill: true, tension: 0, pointRadius: 0 },
+        { label: 'Vacancy', data: expData.map(d => d.vacancy), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.18)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 },
       ],
     },
     options: {
@@ -2362,7 +2354,7 @@ function renderCharts(baseRate) {
       plugins: { tooltip: darkTooltip, legend: { display: false } },
       scales: {
         x: { display: true, ticks: xTickOpts, grid: { color: gridColor } },
-        y: { display: true, min: 0, max: 16, ticks: { ...yTickOpts, callback: v => v + '%' }, grid: { color: gridColor } },
+        y: { display: true, min: 0, max: 15, ticks: { ...yTickOpts, callback: v => v + '%' }, grid: { color: gridColor } },
       },
     },
   });

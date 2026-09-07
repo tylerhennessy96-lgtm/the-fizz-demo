@@ -284,13 +284,12 @@
       <a href="stay-types.html" class="nav-tab">Stay Types</a>
       <a href="rent-control.html" class="nav-tab">Rent Control</a>
       <a href="autopilot.html" class="nav-tab active">Autopilot</a>
+      <a href="parameters.html" class="nav-tab">Parameters</a>
     </div>
     <div class="nav-divider"></div>
     <div style="position:relative;">
       <button class="nav-menu-btn" id="menuBtn" onclick="document.getElementById('navDropdown').classList.toggle('open')"><span></span><span></span><span></span></button>
       <div class="nav-dropdown" id="navDropdown">
-        <a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a>
       </div>
     </div>
@@ -308,17 +307,14 @@
       </select>
     </div>
 
-    <div class="ap-kpis" id="apKpis"></div>
 
     <div class="ap-table-wrap">
       <table class="ap-table">
         <thead>
           <tr>
             <th>House / Week</th>
-            <th>Period</th>
             <th>Autopilot<span class="sub">on / off per house</span></th>
             <th>Auto-accept within<span class="sub">changes outside go to review</span></th>
-            <th>Review peak days<span class="sub">weekends &amp; results waves always manual</span></th>
             <th></th>
           </tr>
         </thead>
@@ -433,7 +429,7 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
   // rows inherit from the built-in defaults, unless explicitly overridden in
   // `overrides` (keyed by parkId or `parkId|weekKey`).
   const RULES_KEY = 'fizz.autopilot';
-  const DEFAULTS = { maxAuto: 5, reviewPeak: false };
+  const DEFAULTS = { maxAuto: 5 };
   function loadRules() {
     const out = { overrides: {} };
     try {
@@ -457,8 +453,6 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
     return {
       maxAuto:        w.maxAuto    != null ? w.maxAuto    : (p.maxAuto    != null ? p.maxAuto    : DEFAULTS.maxAuto),
       maxAutoOwn:     weekKey != null ? w.maxAuto    != null : p.maxAuto    != null,
-      reviewPeak:     w.reviewPeak != null ? w.reviewPeak : (p.reviewPeak != null ? p.reviewPeak : DEFAULTS.reviewPeak),
-      reviewPeakOwn:  weekKey != null ? w.reviewPeak != null : p.reviewPeak != null,
     };
   }
 
@@ -472,7 +466,6 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
         changes++;
         pctSum += pct;
         if (!houseEnabled(park.id)) { review++; return; }
-        if (eff.reviewPeak && (day.isWeekend || day.isHoliday)) { review++; return; }
         if (Math.abs(pct) <= eff.maxAuto) auto++; else review++;
       });
     });
@@ -512,14 +505,6 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
       '</span>'
     );
   }
-  function peakCell(scope, checked, own) {
-    return (
-      '<label class="switch" title="' + (own ? 'Set on this row' : 'Inherited') + '" style="' + (own ? '' : 'opacity:0.55;') + '">' +
-        '<input type="checkbox" class="ap-peak" data-scope="' + scope + '" data-rule="reviewPeak"' + (checked ? ' checked' : '') + '>' +
-        '<span class="switch-track"><span class="switch-thumb"></span></span>' +
-      '</label>'
-    );
-  }
   function resetCell(scope) {
     const hasOwn = Object.keys(ovr(scope)).length > 0;
     return '<button class="ap-inherit-reset" data-scope="' + scope + '" title="Reset to inherited rules"' +
@@ -554,10 +539,8 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
               '<span class="park-country">' + park.country + '</span>' +
             '</span>' +
           '</td>' +
-          '<td><span class="row-meta">8 weeks · ' + WEEKS[0].label + ' … ' + WEEKS[7].label.split('–').pop().trim() + '</span></td>' +
           '<td>' + enabledCell(park.id) + '</td>' +
           '<td' + (houseEnabled(park.id) ? '' : ' style="opacity:.4;"') + '>' + threshCell(park.id, parkEff.maxAuto, parkEff.maxAutoOwn) + '</td>' +
-          '<td' + (houseEnabled(park.id) ? '' : ' style="opacity:.4;"') + '>' + peakCell(park.id, parkEff.reviewPeak, parkEff.reviewPeakOwn) + '</td>' +
           '<td>' + resetCell(park.id) + '</td>' +
         '</tr>'
       );
@@ -569,10 +552,8 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
         out.push(
           '<tr class="row-week" data-park="' + park.id + '" data-week="' + week.key + '">' +
             '<td class="col-name"><span class="lvl-week-name">Week ' + week.num + '</span></td>' +
-            '<td><span class="row-meta">' + week.label + '</span></td>' +
             '<td><span class="row-meta" style="opacity:.7;">' + (houseEnabled(park.id) ? 'On' : 'Off') + ' · house</span></td>' +
             '<td' + (houseEnabled(park.id) ? '' : ' style="opacity:.4;"') + '>' + threshCell(scope, eff.maxAuto, eff.maxAutoOwn) + '</td>' +
-            '<td>' + peakCell(scope, eff.reviewPeak, eff.reviewPeakOwn) + '</td>' +
             '<td>' + resetCell(scope) + '</td>' +
           '</tr>'
         );
@@ -580,18 +561,7 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
     });
 
     body.innerHTML = out.length ? out.join('')
-      : '<tr><td colspan="6" style="text-align:center;font-style:italic;color:var(--text-muted);padding:32px;">No matching houses.</td></tr>';
-    renderKpis(sumStats(allStats));
-  }
-
-  function renderKpis(total) {
-    const autoRate = total.changes ? Math.round((total.auto / total.changes) * 100) : 0;
-    document.getElementById('apKpis').innerHTML =
-      '<div class="ap-kpi"><div class="label">Price changes · 8 weeks</div><div class="value">' + total.changes.toLocaleString('en-GB') + '</div></div>' +
-      '<div class="ap-kpi k-auto"><div class="label">Auto-accepted</div><div class="value">' + total.auto.toLocaleString('en-GB') +
-        '<span class="unit">' + autoRate + '%</span></div></div>' +
-      '<div class="ap-kpi k-review"><div class="label">Needs review</div><div class="value">' + total.review.toLocaleString('en-GB') + '</div></div>' +
-      '<div class="ap-kpi"><div class="label">Avg change</div><div class="value">' + fmtPct(total.avg) + '</div></div>';
+      : '<tr><td colspan="4" style="text-align:center;font-style:italic;color:var(--text-muted);padding:32px;">No matching houses.</td></tr>';
   }
 
   // ── Events: accordion + per-row rule edits ──
@@ -628,8 +598,6 @@ document.addEventListener('click', e => { if(!e.target.closest('.nav-menu-btn') 
       const n = parseFloat(el.value);
       if (isNaN(n)) delete o.maxAuto;
       else o.maxAuto = Math.max(0, Math.min(20, n));
-    } else if (el.dataset.rule === 'reviewPeak') {
-      o.reviewPeak = el.checked;
     } else if (el.dataset.rule === 'enabled') {
       if (el.checked) delete o.enabled;   // on is the default — store only "off"
       else o.enabled = false;

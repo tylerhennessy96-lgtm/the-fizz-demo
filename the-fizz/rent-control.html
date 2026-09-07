@@ -89,7 +89,7 @@
       overflow: hidden;
       /* Single grid template shared by the header row and every rule row so
          columns stay aligned even as content width varies between rows. */
-      --rc-grid: minmax(180px, 1.6fr) minmax(200px, 1.6fr) minmax(200px, 1.4fr) 104px 80px minmax(140px, 1fr) 190px 72px;
+      --rc-grid: minmax(180px, 1.6fr) minmax(220px, 1.6fr) minmax(200px, 1.4fr) 110px 84px 190px;
     }
     .rc-rule-header {
       display: grid;
@@ -375,13 +375,12 @@
       <a href="stay-types.html" class="nav-tab">Stay Types</a>
       <a href="rent-control.html" class="nav-tab active">Rent Control</a>
       <a href="autopilot.html" class="nav-tab">Autopilot</a>
+      <a href="parameters.html" class="nav-tab">Parameters</a>
     </div>
     <div class="nav-divider"></div>
     <div style="position:relative;">
       <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
       <div class="nav-dropdown" id="navDropdown">
-        <a href="parameters.html"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>Parameters</a>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <a href="login.html" style="color:var(--text-secondary);"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 3H3v10h4"/><path d="M10 11l3-3-3-3"/><line x1="13" y1="8" x2="6.5" y2="8"/></svg>Log out</a>
       </div>
     </div>
@@ -409,14 +408,10 @@
     <div class="rc-header">
       <div>
         <h1 class="rc-title">Rent Control</h1>
-        <div class="rc-subtitle">Configure rent increase rules that the pricing engine respects.</div>
+        <div class="rc-subtitle">Rent increase rules the pricing engine respects. Managed centrally by Legal &amp; Compliance.</div>
       </div>
       <div class="rc-header-actions">
         <span class="rc-counter" id="ruleCounter" style="display:none;"></span>
-        <button class="rc-add-btn" onclick="openRuleModal()">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
-          Add Rule
-        </button>
       </div>
     </div>
 
@@ -992,11 +987,7 @@ function renderRuleList() {
       <div class="rc-rule-list">
         <div class="rc-empty">
           <div class="rc-empty-title">No rent control rules configured</div>
-          <div class="rc-empty-desc">Add a rule to cap renewal and new-lease price increases.</div>
-          <button class="rc-add-btn" onclick="openRuleModal()">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
-            Add Rule
-          </button>
+          <div class="rc-empty-desc">No rules apply to the current selection.</div>
         </div>
       </div>`;
     return;
@@ -1061,16 +1052,7 @@ function renderRuleList() {
       ${maxCell}
       <div class="rc-timeframe">${TIMEFRAME_LABEL[rule.timeframe] ?? rule.timeframe}</div>
       ${noticeCell}
-      ${protectionsCell}
       <div class="rc-active">${formatActiveRange(rule)}</div>
-      <div class="rc-actions">
-        <button class="rc-icon-btn" onclick="openRuleModal('${rule.id}')" title="Edit">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2l3 3-7 7H2v-3L9 2z"/></svg>
-        </button>
-        <button class="rc-icon-btn rc-delete-btn" onclick="deleteRule('${rule.id}')" title="Delete">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,4 12,4"/><path d="M4 4V2.5A1 1 0 0 1 5 1.5h4a1 1 0 0 1 1 1V4"/><path d="M3 4l1 8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l1-8"/></svg>
-        </button>
-      </div>
     </div>
   `;
   }).join('');
@@ -1082,9 +1064,7 @@ function renderRuleList() {
       <div>Max Increase</div>
       <div>Timeframe</div>
       <div>Notice</div>
-      <div>Protections</div>
       <div>Active</div>
-      <div></div>
     </div>`;
 
   container.innerHTML = `<div class="rc-rule-list">${header}${rows}</div>`;

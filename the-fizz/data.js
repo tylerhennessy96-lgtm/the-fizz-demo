@@ -80,12 +80,14 @@ const DOUBLE_MULT = 1.25;   // Double Studio ≈ +25% over Single
 // ── Stay types ───────────────────────────────────────────────
 // Premiums are relative to Full Year Stay (the default shown in the table).
 // Plug&Play = fully serviced all-in package (linens, kitchen box, cleaning).
+// Price order is Semester < Full Year < Long Term (longer commitment,
+// higher monthly rate); Plug&Play adds the service uplift on top.
 const STAY_TYPES = [
+  { id: 'semester',       label: 'Semester Stay',             short: 'Semester',       months: 6,  premiumPct: -10 },
+  { id: 'semester_pp',    label: 'Semester Stay Plug&Play',   short: 'Semester P&P',   months: 6,  premiumPct: -3  },
   { id: 'full_year',      label: 'Full Year Stay',            short: 'Full Year',      months: 12, premiumPct: 0   },
-  { id: 'full_year_pp',   label: 'Full Year Stay Plug&Play',  short: 'Full Year P&P',  months: 12, premiumPct: 8   },
-  { id: 'long_term',      label: 'Long Term',                 short: 'Long Term',      months: 24, premiumPct: -4  },
-  { id: 'semester',       label: 'Semester Stay',             short: 'Semester',       months: 6,  premiumPct: 12  },
-  { id: 'semester_pp',    label: 'Semester Stay Plug&Play',   short: 'Semester P&P',   months: 6,  premiumPct: 20  },
+  { id: 'full_year_pp',   label: 'Full Year Stay Plug&Play',  short: 'Full Year P&P',  months: 12, premiumPct: 7   },
+  { id: 'long_term',      label: 'Long Term',                 short: 'Long Term',      months: 24, premiumPct: 4   },
 ];
 const DEFAULT_STAY_TYPE = 'full_year';
 
@@ -520,30 +522,6 @@ let RENT_CONTROL_RULES = [
     bankingAllowed: true, bankingMaxMultiplier: 1.5,
     activeFrom: '2026-01-01T00:00:00.000Z', activeTo: null,
     notes: 'Kappungsgrenze: existing-tenant increases capped at 15% over three years in Hamburg’s designated tight-market zone.',
-  },
-  {
-    id: 'RCR-004',
-    name: 'Vienna Richtwert cap — Brigittenau',
-    scope: { communityIds: ['FZZ-010'], bedTypes: ['Single Studio'], unitIds: ['FZZ-010-SGL-001', 'FZZ-010-SGL-002'] },
-    formula: { type: 'cpi', cpiMultiplier: 100, cpiAddition: 0 },
-    ceiling: null, timeframe: '12mo', firstYearProtection: true,
-    noticePeriodDays: 30, buildingAgeExemptionYears: null,
-    vacancyDecontrol: 'none', vacancyBonusPct: null, vacancyMaxTotalPct: null,
-    bankingAllowed: false, bankingMaxMultiplier: null,
-    activeFrom: '2026-04-01T00:00:00.000Z', activeTo: null,
-    notes: 'Austrian reference-rate regime: annual indexation limited to CPI for pre-1945 building stock.',
-  },
-  {
-    id: 'RCR-005',
-    name: 'Utrecht middenhuur points cap',
-    scope: { communityIds: ['FZZ-011'], bedTypes: ['Single Studio'], unitIds: ['FZZ-011-SGL-002', 'FZZ-011-SGL-003'] },
-    formula: { type: 'lesser_of', operands: [ { type: 'cpi', cpiMultiplier: 100, cpiAddition: 1 }, { type: 'flat_pct', value: 5.5 } ] },
-    ceiling: null, timeframe: '12mo', firstYearProtection: true,
-    noticePeriodDays: 60, buildingAgeExemptionYears: null,
-    vacancyDecontrol: 'none', vacancyBonusPct: null, vacancyMaxTotalPct: null,
-    bankingAllowed: false, bankingMaxMultiplier: null,
-    activeFrom: '2026-01-01T00:00:00.000Z', activeTo: null,
-    notes: 'Dutch WWS points system (Wet betaalbare huur): units scoring under 187 points are capped at the regulated rent table (€1,123/mo at current points); increase capped at lesser of CPI+1% or 5.5%.',
   },
   {
     id: 'RCR-006',
