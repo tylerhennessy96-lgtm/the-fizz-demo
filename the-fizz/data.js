@@ -80,14 +80,14 @@ const DOUBLE_MULT = 1.25;   // Double Studio ≈ +25% over Single
 // ── Stay types ───────────────────────────────────────────────
 // Premiums are relative to Full Year Stay (the default shown in the table).
 // Plug&Play = fully serviced all-in package (linens, kitchen box, cleaning).
-// Price order is Semester < Full Year < Long Term (longer commitment,
+// Price order is Long Term < Full Year < Semester (shorter commitment,
 // higher monthly rate); Plug&Play adds the service uplift on top.
 const STAY_TYPES = [
-  { id: 'semester',       label: 'Semester Stay',             short: 'Semester',       months: 6,  premiumPct: -10 },
-  { id: 'semester_pp',    label: 'Semester Stay Plug&Play',   short: 'Semester P&P',   months: 6,  premiumPct: -3  },
+  { id: 'long_term',      label: 'Long Term',                 short: 'Long Term',      months: 24, premiumPct: -4  },
   { id: 'full_year',      label: 'Full Year Stay',            short: 'Full Year',      months: 12, premiumPct: 0   },
   { id: 'full_year_pp',   label: 'Full Year Stay Plug&Play',  short: 'Full Year P&P',  months: 12, premiumPct: 7   },
-  { id: 'long_term',      label: 'Long Term',                 short: 'Long Term',      months: 24, premiumPct: 4   },
+  { id: 'semester',       label: 'Semester Stay',             short: 'Semester',       months: 6,  premiumPct: 12  },
+  { id: 'semester_pp',    label: 'Semester Stay Plug&Play',   short: 'Semester P&P',   months: 6,  premiumPct: 19  },
 ];
 const DEFAULT_STAY_TYPE = 'full_year';
 
