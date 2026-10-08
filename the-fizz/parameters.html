@@ -25,6 +25,8 @@
       <a href="autopilot.html" class="nav-tab">Autopilot</a>
       <a href="parameters.html" class="nav-tab active">Parameters</a>
     </div>
+    <div class="nav-demo-tag" aria-label="Demo environment">DEMO</div>
+
     <div class="nav-divider"></div>
     <div style="position:relative;">
       <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
@@ -62,20 +64,14 @@ const PARAM_SECTIONS = [
       { id: 'corridor',    label: 'Comp. Corridor' },
     ]
   },
-  {
-    group: 'History',
-    icon: '<circle cx="7" cy="7" r="5"/><polyline points="7,4 7,7 9,9"/>',
-    items: []
-  },
 ];
 
 const SECTION_META = {
   optimization: { title:'Optimization Parameters', desc:'Core pricing optimization bounds and unit grouping behavior' },
   fluctuation:  { title:'Price Fluctuation Rules', desc:'Model hold periods and maximum price movement constraints' },
-  holddays:     { title:'Move-in Hold Pricing', desc:'Hold-time premiums for delayed move-in dates and pace review cadence' },
+  holddays:     { title:'Move-in Hold Pricing', desc:'Hold-time premiums for delayed move-in dates' },
   exposure:     { title:'Booking Pace Alerts', desc:'Thresholds for pace vs the target booking curve that trigger pricing alerts' },
   corridor:     { title:'Price to Comp. Corridor', desc:'Bounds for pricing relative to competitor benchmarks' },
-  history:      { title:'Parameter History', desc:'View parameters as configured on a specific date' },
 };
 
 let selectedParamSection = 'optimization';
@@ -278,7 +274,6 @@ const SECTION_COLUMNS = {
   holddays: [
     { label:'Oct 1 Hold Premium',   render:(p,k)=>pInp(p.octPremiumPct,'%',k('octPremiumPct')) },
     { label:'Semester Floor',       render:(p,k)=>pInp(p.semesterFloorPct,'%',k('semesterFloorPct')) },
-    { label:'Pace Review (days)',   render:(p,k)=>dInp(p.paceReviewDays,k('paceReviewDays')) },
   ],
   exposure: [
     { label:'Pace vs Target — Prio 1', render:(p,k)=>pInpSigned(p.paceAlertPrio1,k('paceAlertPrio1'),'negative') },
@@ -309,8 +304,6 @@ function renderParamPanel() {
   let body = '';
   if (SECTION_COLUMNS[selectedParamSection]) {
     body = renderColumnSection(selectedParamSection);
-  } else if (selectedParamSection === 'history') {
-    body = renderHistorySection();
   }
 
   panel.innerHTML = header + body;
@@ -368,105 +361,6 @@ function renderColumnSection(sectionId) {
       </div>
     </div>
   `;
-}
-
-// ── History ──────────────────────────────────────────────
-function renderHistorySection() {
-  return `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border);">
-      <span style="font-size:13px;color:var(--text-secondary);">View parameters as of:</span>
-      <input type="date" id="historyDate" onchange="loadHistoryParams(this.value)" style="border:1px solid var(--border-mid);border-radius:var(--radius);padding:6px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text-primary);outline:none;background:var(--surface);">
-      <button onclick="setHistoryDate(30)" class="btn btn-ghost" style="font-size:11px;padding:5px 10px;">30 days ago</button>
-      <button onclick="setHistoryDate(60)" class="btn btn-ghost" style="font-size:11px;padding:5px 10px;">60 days ago</button>
-      <button onclick="setHistoryDate(90)" class="btn btn-ghost" style="font-size:11px;padding:5px 10px;">90 days ago</button>
-    </div>
-    <div id="historyContent"></div>
-  `;
-}
-
-function setHistoryDate(daysAgo) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  const formatted = d.toISOString().split('T')[0];
-  const el = document.getElementById('historyDate');
-  if (el) el.value = formatted;
-  loadHistoryParams(formatted);
-}
-
-function loadHistoryParams(dateStr) {
-  if (!dateStr) return;
-  const seed = new Date(dateStr).getTime();
-  const variation = (Math.floor(seed / 86400000) % 5) - 2;
-  renderHistoryView(variation);
-}
-
-function renderHistoryView(variation) {
-  const data = getFilteredCommunities();
-  const sections = [
-    { id:'optimization', title:'Optimization', cols:SECTION_COLUMNS.optimization },
-    { id:'fluctuation',  title:'Price Fluctuation', cols:SECTION_COLUMNS.fluctuation },
-    { id:'holddays',     title:'Move-in Hold Pricing', cols:SECTION_COLUMNS.holddays },
-    { id:'exposure',     title:'Booking Pace Alerts', cols:SECTION_COLUMNS.exposure },
-    { id:'corridor',     title:'Comp. Corridor', cols:SECTION_COLUMNS.corridor },
-  ];
-
-  // Render each parameter as text, applying small variation
-  function snapshot(p, key) {
-    const cur = p[key];
-    if (typeof cur === 'number') {
-      const histVal = parseFloat((cur + variation * 0.5).toFixed(1));
-      const changed = histVal !== cur;
-      return { val: histVal, cur, changed };
-    }
-    return { val: cur, cur, changed: false };
-  }
-
-  // Map column label → param key
-  const COL_KEY = {
-    'Max Price Change':'maxPriceChange', 'Min Price Change':'minPriceChange', 'Unit Group':'unitGroup',
-    'Model Hold Days':'modelHoldDays', 'Price Change Down':'modelPriceDown', 'Price Change Up':'modelPriceUp', 'Manual Hold Days':'manualHoldDays',
-        'Oct 1 Hold Premium':'octPremiumPct', 'Semester Floor':'semesterFloorPct', 'Pace Review (days)':'paceReviewDays',
-    'Pace vs Target — Prio 1':'paceAlertPrio1', 'Pace vs Target — Prio 2':'paceAlertPrio2',
-    'Trigger Threshold':'concessionTrigger', 'LT Lower':'ltLower', 'LT Upper':'ltUpper',
-  };
-
-  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">';
-  sections.forEach(s => {
-    let rows = '';
-    data.forEach(comm => {
-      const cells = s.cols.map(col => {
-        // Section-specific param key for ambiguous labels
-        let key = COL_KEY[col.label];
-        if (s.id === 'corridor') {
-          if (col.label === 'Max') key = 'compCorrMax';
-          else if (col.label === 'Min') key = 'compCorrMin';
-          else if (col.label === 'Prio 1') key = 'compCorrPrio1';
-          else if (col.label === 'Prio 2') key = 'compCorrPrio2';
-        }
-        if (!key) return '<td style="padding:6px 8px;text-align:center;font-size:12px;color:var(--text-muted);">—</td>';
-        const snap = snapshot(comm.params, key);
-        const bg = snap.changed ? 'background:rgba(245,166,35,0.08);' : '';
-        const badge = snap.changed ? ' <span style="font-size:9px;color:#92400e;background:rgba(245,166,35,0.2);border-radius:3px;padding:1px 4px;margin-left:4px;">Changed</span>' : '';
-        return `<td style="padding:6px 8px;text-align:center;font-size:12px;color:var(--text-primary);${bg}">${snap.val}${badge}</td>`;
-      }).join('');
-      rows += `<tr><td style="padding:7px 12px;font-weight:500;font-size:12.5px;white-space:nowrap;">${comm.name}</td>${cells}</tr>`;
-    });
-    const ths = s.cols.map(c => `<th style="text-align:center;font-size:10.5px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;padding:8px;">${c.label}</th>`).join('');
-    html += `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-        <div style="padding:12px 16px;background:var(--body-bg);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-primary);text-transform:uppercase;letter-spacing:.05em;">${s.title}</div>
-        <div style="overflow-x:auto;">
-          <table class="data-table" style="width:100%;">
-            <thead><tr><th style="text-align:left;font-size:10.5px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;padding:8px 12px;">House</th>${ths}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  });
-  html += '</div>';
-  const el = document.getElementById('historyContent');
-  if (el) el.innerHTML = html;
 }
 
 // ── Save ─────────────────────────────────────────────────

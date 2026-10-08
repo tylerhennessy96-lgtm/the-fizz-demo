@@ -4,8 +4,38 @@
     {
       "name": "fizz-demo",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8642", "--directory", "/Users/tylerhennessy/Desktop/thefizz/the-fizz"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8642",
+        "--directory",
+        "/Users/tylerhennessy/Desktop/thefizz/the-fizz"
+      ],
       "port": 8642
+    },
+    {
+      "name": "adisseo-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8643",
+        "--directory",
+        "/Users/tylerhennessy/Desktop/Adisseo/adisseo"
+      ],
+      "port": 8643
+    },
+    {
+      "name": "sunwing-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8644",
+        "--directory",
+        "/Users/tylerhennessy/Desktop/Final SW Demo/application/data"
+      ],
+      "port": 8644
     }
   ]
 }

@@ -9,40 +9,6 @@
   <script src="data.js"></script>
   <style>
     /* ── Unit filter row (secondary, below global filter bar) ─ */
-    .rc-unit-filter-row {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 8px 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .rc-unit-search {
-      border: 1px solid var(--border-mid);
-      border-radius: var(--radius);
-      padding: 6px 10px 6px 30px;
-      font-family: 'Inter', sans-serif;
-      font-size: 12.5px;
-      color: var(--text-primary);
-      background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none' stroke='%239ca3af' stroke-width='1.5'%3E%3Ccircle cx='6' cy='6' r='4'/%3E%3Cline x1='9' y1='9' x2='12.5' y2='12.5'/%3E%3C/svg%3E") no-repeat 9px center;
-      width: 320px;
-      outline: none;
-    }
-    .rc-unit-search:focus { border-color: var(--accent); }
-    /* Community group header inside the unit dropdown. Renders against the
-       dark dropdown bg, so the muted-light text matches the option text tone. */
-    .ms-group-header {
-      padding: 7px 12px 4px;
-      font-size: 10px;
-      font-weight: 700;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      border-top: 1px solid #2a2d35;
-      pointer-events: none;
-    }
-    .ms-group-header:first-of-type { border-top: none; }
 
     /* Visible-rule counter, shown next to Add Rule when a unit filter narrows */
     .rc-counter { font-size: 12px; color: var(--text-muted); }
@@ -89,7 +55,7 @@
       overflow: hidden;
       /* Single grid template shared by the header row and every rule row so
          columns stay aligned even as content width varies between rows. */
-      --rc-grid: minmax(180px, 1.6fr) minmax(220px, 1.6fr) minmax(200px, 1.4fr) 110px 84px 190px;
+      --rc-grid: minmax(180px, 1.6fr) minmax(220px, 1.6fr) minmax(200px, 1.4fr) 110px 190px;
     }
     .rc-rule-header {
       display: grid;
@@ -121,7 +87,6 @@
     .rc-max-formula  { font-size: 12.5px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
     .rc-max-current  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; font-weight: 400; }
     .rc-timeframe { font-size: 12.5px; color: var(--text-secondary); }
-    .rc-notice { font-size: 12.5px; color: var(--text-secondary); }
     .rc-protections { font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; }
     .rc-protections-empty { color: var(--text-muted); }
     .rc-active { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
@@ -377,6 +342,8 @@
       <a href="autopilot.html" class="nav-tab">Autopilot</a>
       <a href="parameters.html" class="nav-tab">Parameters</a>
     </div>
+    <div class="nav-demo-tag" aria-label="Demo environment">DEMO</div>
+
     <div class="nav-divider"></div>
     <div style="position:relative;">
       <button class="nav-menu-btn" id="menuBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
@@ -387,22 +354,6 @@
   </nav>
 
   <div class="filter-bar" id="filterBar"></div>
-
-  <div class="rc-unit-filter-row">
-    <input type="search" id="unitSearch" class="rc-unit-search"
-           placeholder="Find unit by ID (e.g. FZZ-005-SGL-002)"
-           oninput="onUnitSearchInput()">
-    <div class="ms-wrap" id="ms-unit">
-      <button class="ms-trigger" onclick="toggleMs('unit')" data-default="All Units">
-        <span class="ms-label">All Units</span>
-        <svg viewBox="0 0 10 6" width="10" height="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
-      </button>
-      <div class="ms-dropdown">
-        <div class="ms-search"><input type="text" placeholder="Search units..." oninput="filterMsOptions('unit',this.value)"></div>
-        <div class="ms-options" id="unitMsOptions"></div>
-      </div>
-    </div>
-  </div>
 
   <div class="rc-page">
     <div class="rc-header">
@@ -512,10 +463,6 @@
         </div>
         <div class="rc-field-inline">
           <div class="rc-field">
-            <label class="rc-field-label">Notice period (days)</label>
-            <input type="number" id="noticeDays" class="rc-number-input" value="30" oninput="formNoticeDays = parseInt(this.value, 10) || 0;">
-          </div>
-          <div class="rc-field">
             <label class="rc-field-label">Building age exemption (years)</label>
             <input type="number" id="buildingAge" class="rc-number-input" placeholder="Leave blank for none" oninput="formBuildingAge = this.value === '' ? null : parseInt(this.value, 10);">
           </div>
@@ -600,7 +547,6 @@ let formScope = { communityIds: 'all', bedTypes: 'all', unitIds: 'all' };
 let formFormula = { type: 'flat_pct', value: 5 };
 let formCeiling = null;
 let formFirstYear = false;
-let formNoticeDays = 30;
 let formBuildingAge = null;
 let formVacancy = 'none';
 let formVacancyBonus = null;
@@ -688,7 +634,6 @@ function updateMsLabel(id) {
 let pillFilters = null;
 const GLOBAL_FILTER_IDS = ['state','metro','community','rm','cd'];
 function getMsValues(id) {
-  if (id === 'unit') return _msDomValues('unit');
   return pillFilters ? pillFilters.values(id) : [];
 }
 function populateFilters() {
@@ -701,26 +646,12 @@ function populateFilters() {
       { id:'rm',        label:'Revenue Managers', items:[...new Set(COMMUNITIES.map(c => c.rm))] },
       { id:'cd',        label:'House Managers',   items:[...new Set(COMMUNITIES.map(c => c.hm))] },
     ],
-    onChange: () => { rebuildUnitDropdown(); renderRuleList(); },
+    onChange: () => { renderRuleList(); },
   });
 }
 function clearAllFilters() {
   if (pillFilters) pillFilters.clearAll();
 }
-
-// Resets just the unit search + unit multi-select. Leaves global filters alone.
-function clearUnitFilters() {
-  document.getElementById('unitSearch').value = '';
-  const w = document.getElementById('ms-unit');
-  if (w) {
-    w.querySelectorAll('.ms-options input').forEach(cb => cb.checked = false);
-    const allCb = w.querySelector('input[value="__all__"]');
-    if (allCb) allCb.checked = true;
-    updateMsLabel('unit');
-  }
-  renderRuleList();
-}
-function onUnitSearchInput() { renderRuleList(); }
 
 // Returns the community IDs surviving the current global filters. When no
 // filters are active this returns every community ID.
@@ -775,78 +706,12 @@ function ruleCoversUnit(rule, commId, bedType, unitId) {
   return true;
 }
 
-// Returns the set of target unit IDs derived from the search input and the
-// unit multi-select. Returns null when no unit filter is active.
-function getUnitFilterTargets() {
-  const search = document.getElementById('unitSearch')?.value.trim().toLowerCase() ?? '';
-  const selected = getMsValues('unit');
-  if (!search && !selected.length) return null;
-  const targets = new Set();
-  if (search) {
-    Object.values(UNIT_INDEX).forEach(u => {
-      if (u.id.toLowerCase().includes(search)) targets.add(u.id);
-    });
-  }
-  selected.forEach(id => targets.add(id));
-  return targets;
-}
-
-// The final rule list: globally filtered rules, then narrowed further by unit
-// targets when a unit filter is active.
+// The rule list is driven by the global pill filters only (the unit search /
+// unit picker was removed from this page).
 function getVisibleRules() {
-  const base = getFilteredRules();
-  const targets = getUnitFilterTargets();
-  if (!targets) return base;
-  return base.filter(r => {
-    for (const uid of targets) {
-      const u = UNIT_INDEX[uid];
-      if (u && ruleCoversUnit(r, u.commId, u.bedType, u.id)) return true;
-    }
-    return false;
-  });
+  return getFilteredRules();
 }
-
-function isUnitFilterActive() {
-  const s = document.getElementById('unitSearch')?.value.trim() ?? '';
-  return s.length > 0 || getMsValues('unit').length > 0;
-}
-
-// Builds the unit multi-select dropdown content. Cascades off the global
-// community filter — only units whose parent community survives the global
-// filters appear. Units are grouped by community with a small header above
-// each group. Previously-checked values that survive the narrowing stay
-// checked; ones that got pruned are dropped silently.
-function rebuildUnitDropdown() {
-  const options = document.getElementById('unitMsOptions');
-  if (!options) return;
-
-  const prev = new Set(getMsValues('unit'));
-  const allowedCommIds = new Set(getFilteredCommunityIds());
-
-  // Group units by community, preserving PRICING_DATA order.
-  const groups = [];
-  PRICING_DATA.forEach(comm => {
-    if (!allowedCommIds.has(comm.id)) return;
-    const bucket = { commName: comm.name, units: [] };
-    comm.bedTypes.forEach(bt => bt.units.forEach(u => bucket.units.push(u.id)));
-    if (bucket.units.length) groups.push(bucket);
-  });
-
-  const allIds = new Set(groups.flatMap(g => g.units));
-  const stillChecked = [...prev].filter(id => allIds.has(id));
-  const allActive = stillChecked.length === 0;
-
-  let html = `<label class="ms-option ms-all"><input type="checkbox" value="__all__" ${allActive ? 'checked' : ''} onchange="toggleMsAll('unit',this)"> All</label>`;
-  groups.forEach(g => {
-    html += `<div class="ms-group-header">${escapeHtml(g.commName)}</div>`;
-    g.units.forEach(uid => {
-      const checked = !allActive && stillChecked.includes(uid);
-      html += `<label class="ms-option"><input type="checkbox" value="${uid}" ${checked ? 'checked' : ''} onchange="onMsChange('unit')"> ${uid}</label>`;
-    });
-  });
-  options.innerHTML = html;
-  updateMsLabel('unit');
-}
+function isUnitFilterActive() { return false; }
 
 function updateRuleCounter(visible, total) {
   const el = document.getElementById('ruleCounter');
@@ -997,17 +862,7 @@ function renderRuleList() {
   updateRuleCounter(visibleRules.length, RENT_CONTROL_RULES.length);
 
   if (!visibleRules.length) {
-    // Two distinct empty states: unit-filter-driven vs global-filter-driven.
-    // The unit one offers a partial reset that preserves the global context.
-    if (isUnitFilterActive()) {
-      container.innerHTML = `
-        <div class="rc-rule-list">
-          <div class="rc-empty">
-            <div class="rc-empty-title">No rent control rules apply to the specified unit(s).</div>
-            <button class="btn btn-ghost" onclick="clearUnitFilters()">Clear unit filters</button>
-          </div>
-        </div>`;
-    } else {
+    {
       container.innerHTML = `
         <div class="rc-rule-list">
           <div class="rc-empty">
@@ -1029,9 +884,6 @@ function renderRuleList() {
         ${showCurrent ? `<div class="rc-max-current">Currently: ${escapeHtml(formatEffectiveCap(rule.formula, rule.ceiling, CURRENT_CPI))}</div>` : ''}
       </div>`;
 
-    const noticeDays = rule.noticePeriodDays ?? 30;
-    const noticeCell = `<div class="rc-notice">${noticeDays} days</div>`;
-
     // Compact inline list of enabled protections, middot-separated. Matches
     // the order in the edit modal: first-year → vacancy → banking.
     const protections = [];
@@ -1051,7 +903,6 @@ function renderRuleList() {
       <div class="rc-scope">${escapeHtml(computeScopeSummary(rule.scope))}</div>
       ${maxCell}
       <div class="rc-timeframe">${TIMEFRAME_LABEL[rule.timeframe] ?? rule.timeframe}</div>
-      ${noticeCell}
       <div class="rc-active">${formatActiveRange(rule)}</div>
     </div>
   `;
@@ -1063,7 +914,6 @@ function renderRuleList() {
       <div>Scope</div>
       <div>Max Increase</div>
       <div>Timeframe</div>
-      <div>Notice</div>
       <div>Active</div>
     </div>`;
 
@@ -1399,7 +1249,6 @@ function openRuleModal(ruleId) {
     formFormula = JSON.parse(JSON.stringify(r.formula));
     formCeiling = r.ceiling ?? null;
     formFirstYear    = !!r.firstYearProtection;
-    formNoticeDays   = r.noticePeriodDays ?? 30;
     formBuildingAge  = r.buildingAgeExemptionYears ?? null;
     formVacancy      = r.vacancyDecontrol ?? 'none';
     formVacancyBonus = r.vacancyBonusPct ?? null;
@@ -1416,7 +1265,6 @@ function openRuleModal(ruleId) {
     formFormula = { type: 'flat_pct', value: 5 };
     formCeiling = null;
     formFirstYear    = false;
-    formNoticeDays   = 30;
     formBuildingAge  = null;
     formVacancy      = 'none';
     formVacancyBonus = null;
@@ -1435,7 +1283,6 @@ function openRuleModal(ruleId) {
   document.getElementById('calcType').value = formFormula.type;
   document.getElementById('ceilingValue').value = formCeiling == null ? '' : String(formCeiling);
   document.getElementById('firstYearProtection').checked = formFirstYear;
-  document.getElementById('noticeDays').value = String(formNoticeDays);
   document.getElementById('buildingAge').value = formBuildingAge == null ? '' : String(formBuildingAge);
   document.getElementById('vacancyDecontrol').value = formVacancy;
   document.getElementById('vacancyBonusFields').style.display = formVacancy === 'bonus' ? 'block' : 'none';
@@ -1485,7 +1332,6 @@ function saveRule() {
     ceiling: formCeiling,
     timeframe: document.getElementById('timeframe').value,
     firstYearProtection: formFirstYear,
-    noticePeriodDays: formNoticeDays,
     buildingAgeExemptionYears: formBuildingAge,
     vacancyDecontrol: formVacancy,
     vacancyBonusPct: formVacancy === 'bonus' ? formVacancyBonus : null,
@@ -1522,7 +1368,6 @@ function deleteRule(ruleId) {
 
 // ── Init ─────────────────────────────────────────────────
 populateFilters();
-rebuildUnitDropdown();
 renderRuleList();
 </script>
 </body>
