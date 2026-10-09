@@ -34,6 +34,10 @@
     .stay-prem-input:disabled { background: var(--body-bg); color: var(--text-muted); border-style: dashed; }
     .stay-prem-input.changed { border-color: var(--accent); background: rgba(232,0,125,0.05); }
     .stay-th-months { font-size: 9.5px; color: var(--text-muted); font-weight: 400; display: block; margin-top: 2px; }
+    /* Table hugs its columns so the empty space sits after the toggles, not between the names and the toggles */
+    table.data-table#stayTable { width: auto; min-width: 0; }
+    table.data-table#stayTable th:first-child, table.data-table#stayTable td:first-child { width: 260px; min-width: 260px; }
+    table.data-table#stayTable .stay-cell { width: 118px; }
   </style>
 </head>
 <body>
@@ -155,7 +159,7 @@ function renderHead() {
   const head = document.getElementById('stayHead');
   STAY_TYPES.forEach(st => {
     const th = document.createElement('th');
-    th.style.cssText = 'width:130px;text-align:center;font-size:12px;padding:8px 6px;';
+    th.style.cssText = 'width:118px;text-align:center;font-size:12px;padding:8px 6px;white-space:nowrap;';
     th.innerHTML = st.label.replace(' Plug&Play', '<br>Plug&amp;Play') +
       '<span class="stay-th-months">' + st.months + ' months · default ' + (st.premiumPct > 0 ? '+' : '') + st.premiumPct + '%</span>';
     head.appendChild(th);

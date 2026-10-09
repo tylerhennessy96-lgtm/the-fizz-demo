@@ -187,7 +187,13 @@ function makeRoomTypeMetrics(house, roomType) {
   // Projected occupancy at move-in (%)
   const projOcc = Math.min(100, Math.round((sellThrough / benchmarkSellThrough) * 88 + rpick(r, -4, 6)));
 
-  return { fcst, sold, ros, demand, projOcc };
+  // Price position vs the competitor median (%). Tied to the same signal:
+  // a cluster pacing behind tends to be priced above its competitors (which
+  // is why it lags), a cluster pacing ahead sits below them — so an
+  // "outside corridor" alert never contradicts the pace/demand story.
+  const compPos = Math.round(-(sellThrough - benchmarkSellThrough) * 45 + rpick(r, -7, 7));
+
+  return { fcst, sold, ros, demand, projOcc, compPos };
 }
 
 // ── Unit factory ─────────────────────────────────────────────
@@ -237,24 +243,27 @@ function makeUnits(house, roomType, count, rtMetrics) {
 
 // ── Alerts ───────────────────────────────────────────────────
 const ALERT_DEFAULTS = {
-  lowPace:    { enabled: true, threshold: -15 },   // pace % below
-  highDemand: { enabled: true, threshold: 80 },
-  lowDemand:  { enabled: true, threshold: 25 },
+  lowPace:      { enabled: true, threshold: -15 },   // pace % below
+  highDemand:   { enabled: true, threshold: 80 },
+  lowDemand:    { enabled: true, threshold: 25 },
+  compCorridor: { enabled: true, max: 10, min: -45 }, // price vs competitor median (%) outside this band
 };
 
 const ALERT_META = {
   lowPace:    { label: 'Low pace',    color: '#ea580c' },
   highDemand: { label: 'High demand', color: '#16a34a' },
   lowDemand:  { label: 'Low demand',  color: '#2563eb' },
+  compCorridor: { label: 'Outside comp. corridor', color: '#7c3aed' },
 };
 
 const ALERT_ICONS = {
   lowPace:    '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,3 4,5.5 6,4 8,6.5"/><polygon points="6.5,8.7 8.7,8.7 8.7,5.5" fill="currentColor" stroke="none"/></svg>',
   highDemand: '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,6.5 4,4 6,5.5 8.5,2"/><polyline points="6.3,2 8.5,2 8.5,4.2"/></svg>',
   lowDemand:  '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,3.5 4,6 6,4.5 8.5,8"/><polyline points="6.3,8 8.5,8 8.5,5.8"/></svg>',
+  compCorridor: '<svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="1.5" y1="3" x2="8.5" y2="3" stroke-dasharray="1.6 1.2"/><line x1="1.5" y1="7" x2="8.5" y2="7" stroke-dasharray="1.6 1.2"/><circle cx="5" cy="1.3" r="1" fill="currentColor" stroke="none"/></svg>',
 };
 
-const ALERT_ORDER = ['lowPace', 'highDemand', 'lowDemand'];
+const ALERT_ORDER = ['lowPace', 'highDemand', 'lowDemand', 'compCorridor'];
 
 function makeAlert(type, tooltip, isRollup) {
   return { type, tooltip, isRollup: !!isRollup, label: ALERT_META[type].label, color: ALERT_META[type].color };
@@ -276,6 +285,11 @@ function computeAlerts(m, cfg) {
   if (cfg.lowDemand.enabled && m.demand < cfg.lowDemand.threshold) {
     const dl = demandLevelForScore(m.demand);
     out.push(makeAlert('lowDemand', 'Low demand: ' + dl.code + ' — ' + dl.label + ' (forecast ' + signedPpt(demandPpt(m.demand)) + ' vs expected)'));
+  }
+  const cc = cfg.compCorridor;
+  if (cc && cc.enabled && typeof m.compPos === 'number' && (m.compPos > cc.max || m.compPos < cc.min)) {
+    const side = m.compPos > cc.max ? 'above' : 'below';
+    out.push(makeAlert('compCorridor', 'Outside competitor corridor (' + side + '): priced ' + (m.compPos > 0 ? '+' : '') + m.compPos + '% vs competitor median — corridor is ' + cc.min + '% to +' + cc.max + '%'));
   }
   return out;
 }
@@ -317,7 +331,7 @@ const PRICING_DATA = HOUSES.map(h => {
       units,
       rate: avgRate,
       rec: avgRec,
-      sold: m.sold, fcst: m.fcst, ros: m.ros, demand: m.demand, projOcc: m.projOcc,
+      sold: m.sold, fcst: m.fcst, ros: m.ros, demand: m.demand, projOcc: m.projOcc, compPos: m.compPos,
       note: null,
     };
   });

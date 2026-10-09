@@ -55,7 +55,10 @@
       overflow: hidden;
       /* Single grid template shared by the header row and every rule row so
          columns stay aligned even as content width varies between rows. */
-      --rc-grid: minmax(180px, 1.6fr) minmax(220px, 1.6fr) minmax(200px, 1.4fr) 110px 190px;
+      --rc-grid: 290px 250px 150px 110px 180px;
+      /* Hug the content: the card ends after the last column and the page's white space sits outside it */
+      width: max-content;
+      max-width: 100%;
     }
     .rc-rule-header {
       display: grid;

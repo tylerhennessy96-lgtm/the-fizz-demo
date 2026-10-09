@@ -43,6 +43,17 @@
     .lock-date-trigger.is-placeholder { color: var(--text-muted); }
     .lock-date-trigger svg { color: var(--text-muted); flex-shrink: 0; }
 
+    /* Advanced filters: "Clear all" ghost button beside Apply */
+    .btn-adv-clear {
+      flex: 0 0 auto;
+      font-family: 'Inter', sans-serif; font-size: 12.5px; font-weight: 600;
+      padding: 9px 14px; border-radius: var(--radius); cursor: pointer;
+      background: transparent; color: var(--text-secondary); border: 1px solid var(--border-mid);
+      transition: background .12s, color .12s;
+    }
+    .btn-adv-clear:hover { background: #f3f4f8; color: var(--text-primary); }
+    .adv-footer .btn-apply { flex: 1; }
+
     /* ── Action cell + accept/reject buttons (SmartGate styling) ── */
     td.action-cell { white-space: nowrap; }
     .action-cell-inner { display: inline-flex; align-items: center; gap: 6px; }
@@ -92,6 +103,9 @@
       width: 34px !important; min-width: 34px !important;
       padding: 4px 8px 4px 12px !important; text-align: center;
     }
+    /* Indent the name column — the select checkbox is the first cell now */
+    table.data-table tbody tr.row-bedtype td:nth-child(2) { padding-left: 24px; }
+    table.data-table tbody tr.row-unit    td:nth-child(2) { padding-left: 40px; }
     input.row-select {
       width: 14px; height: 14px;
       accent-color: var(--accent);
@@ -391,6 +405,12 @@
       </svg>
       <span class="accept-all-label">Accept (0)</span>
     </button>
+    <button class="accept-all-btn" id="rejectAllBtn" type="button" disabled style="margin-right:8px;">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3.5" y1="3.5" x2="10.5" y2="10.5"/><line x1="10.5" y1="3.5" x2="3.5" y2="10.5"/>
+      </svg>
+      <span class="reject-all-label">Reject (0)</span>
+    </button>
     <button class="commit-btn" id="commitBtn" type="button" disabled style="margin-right:12px;">
       <span class="commit-spinner"></span>
       <span class="commit-label">Commit (0)</span>
@@ -564,6 +584,16 @@
           <option value="lowPace">Low pace</option>
           <option value="highDemand">High demand</option>
           <option value="lowDemand">Low demand</option>
+          <option value="compCorridor">Outside comp. corridor</option>
+        </select>
+      </div>
+
+      <div class="adv-section">
+        <div class="adv-section-title">Notes</div>
+        <select class="adv-full-select" id="notesFilter" onchange="renderTable()">
+          <option value="">All</option>
+          <option value="has">Has notes</option>
+          <option value="none">No notes</option>
         </select>
       </div>
 
@@ -578,7 +608,8 @@
       </div>
       </div>
 
-      <div class="adv-footer">
+      <div class="adv-footer" style="display:flex;align-items:center;gap:8px;">
+        <button class="btn-adv-clear" type="button" onclick="clearAdvFilters()">Clear all</button>
         <button class="btn-apply" onclick="renderTable();toggleAdvDrawer()">Apply</button>
       </div>
     </div>
@@ -606,9 +637,6 @@
           <canvas id="stayChart"></canvas>
         </div>
         <table id="stayTable" style="width:100%;border-collapse:collapse;font-size:12.5px;border-top:1px solid var(--border);"></table>
-      </div>
-      <div style="margin-top:12px;font-size:11.5px;color:var(--text-muted);line-height:1.5;">
-        October move-in carries the hold-time premium — the room is held empty through September.
       </div>
     </div>
     <div class="modal-footer" style="display:flex;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border);">
@@ -1087,6 +1115,11 @@ function syncBulkToolbar() {
     accBtn.querySelector('.accept-all-label').textContent = 'Accept (' + selectedUnits.size + ')';
     accBtn.disabled = selectedUnits.size === 0;
   }
+  const rejBtn = document.getElementById('rejectAllBtn');
+  if (rejBtn) {
+    rejBtn.querySelector('.reject-all-label').textContent = 'Reject (' + selectedUnits.size + ')';
+    rejBtn.disabled = selectedUnits.size === 0;
+  }
   const selAll = document.getElementById('selectAllRows');
   if (selAll) {
     selAll.checked = _renderedUnits.length > 0 && _renderedUnits.every(u => selectedUnits.has(u.id));
@@ -1208,6 +1241,55 @@ document.getElementById('acceptAllBtn').addEventListener('click', () => {
   showToast('Accepted ' + n + ' recommendation' + (n === 1 ? '' : 's'));
 });
 
+// Reject the selected units' recommendations
+document.getElementById('rejectAllBtn').addEventListener('click', () => {
+  if (!selectedUnits.size) return;
+  let n = 0;
+  selectedUnits.forEach(id => {
+    const u = findUnit(id);
+    if (!u) return;
+    if (u.lock && u.lock.locked) return;
+    recStates[id] = { state: 'rejected' };
+    n++;
+  });
+  selectedUnits.clear();
+  renderTableInPlace();
+  showToast('Rejected ' + n + ' recommendation' + (n === 1 ? '' : 's'));
+});
+
+// ── Scope-level accept / reject (house and room-type rows) ──
+function scopeRecState(units) {
+  const live = units.filter(u => !(u.lock && u.lock.locked));
+  if (!live.length) return '';
+  if (live.every(u => recStates[u.id]?.state === 'accepted')) return 'accepted';
+  if (live.every(u => recStates[u.id]?.state === 'rejected')) return 'rejected';
+  return '';
+}
+function scopeUnits(houseId, rtType) {
+  const house = PRICING_DATA.find(h => h.id === houseId);
+  if (!house) return [];
+  return rtType ? (house.roomTypes.find(r => r.type === rtType)?.units ?? []) : house.roomTypes.flatMap(r => r.units);
+}
+function setScopeRec(houseId, rtType, state) {
+  const units = scopeUnits(houseId, rtType);
+  const current = scopeRecState(units);
+  units.forEach(u => {
+    if (u.lock && u.lock.locked) return;
+    if (current === state) delete recStates[u.id];     // second click clears the decision
+    else recStates[u.id] = { state };
+  });
+  renderTableInPlace();
+}
+function scopeActionCell(units, houseId, rtType) {
+  const st = scopeRecState(units);
+  const args = `'${houseId}',${rtType ? `'${rtType}'` : 'null'}`;
+  const what = rtType ? 'all units of this room type' : 'all units in this house';
+  return `<td class="action-cell"><span class="action-cell-inner">
+    <button class="action-btn act-accept ${st === 'accepted' ? 'solid' : ''}" type="button" title="Accept recommendations for ${what}" onclick="event.stopPropagation();setScopeRec(${args},'accepted')"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,7.5 5.5,10.5 11.5,3.5"/></svg></button>
+    <button class="action-btn act-reject ${st === 'rejected' ? 'solid' : ''}" type="button" title="Reject recommendations for ${what}" onclick="event.stopPropagation();setScopeRec(${args},'rejected')"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3.5" y1="3.5" x2="10.5" y2="10.5"/><line x1="10.5" y1="3.5" x2="3.5" y2="10.5"/></svg></button>
+  </span></td>`;
+}
+
 // Select-all header checkbox
 document.getElementById('selectAllRows').addEventListener('change', e => {
   if (e.target.checked) _renderedUnits.forEach(u => selectedUnits.add(u.id));
@@ -1270,6 +1352,7 @@ const alertConfig = {
   lowPace:    { label: 'Low pace',    icon: '<polyline points="2,4 5,7 8,5.5 12,10"/><polyline points="9,10 12,10 12,7"/>' },
   highDemand: { label: 'High demand', icon: '<polyline points="2,10 5,7 8,8.5 12,4"/><polyline points="9,4 12,4 12,7"/>' },
   lowDemand:  { label: 'Low demand',  icon: '<polyline points="2,4 6,8 8,6.5 12,10"/><circle cx="12" cy="10" r=".8" fill="currentColor"/>' },
+  compCorridor: { label: 'Outside comp. corridor', icon: '<line x1="2" y1="4.5" x2="12" y2="4.5" stroke-dasharray="2 1.5"/><line x1="2" y1="9.5" x2="12" y2="9.5" stroke-dasharray="2 1.5"/><circle cx="7" cy="2.2" r="1.2" fill="currentColor"/>' },
 };
 
 function alertsCellHtml(alerts) {
@@ -1465,6 +1548,7 @@ function renderTable() {
   const onNoticeOn = document.getElementById('statusOnNotice')?.checked;
   const alertF     = document.getElementById('alertFilter')?.value;
   const recF       = document.getElementById('recFilter')?.value;
+  const notesF     = document.getElementById('notesFilter')?.value;
   const _rtFiltered = new Map();
   data.forEach(house => house.roomTypes.forEach(rt => {
     const rtAlertTypes = new Set(computeAlerts(rt, alertCfg).map(a => a.type));
@@ -1477,6 +1561,11 @@ function renderTable() {
       }
       if (alertF && !rtAlertTypes.has(alertF)) return false;
       if (recF && recActionFor(unit) !== recF) return false;
+      if (notesF) {
+        const hasNote = !!(unit.note || rt.note);   // a note on the room type covers its units
+        if (notesF === 'has' && !hasNote) return false;
+        if (notesF === 'none' && hasNote) return false;
+      }
       return true;
     });
     _rtFiltered.set(house.id + rt.type, filtered);
@@ -1515,7 +1604,7 @@ function renderTable() {
       <td>${dlBadge(house.demand)}</td>
       <td></td><td></td><td></td><td></td>
       <td>${recSummaryHtml(house.roomTypes.flatMap(rt => rt.units))}</td>
-      <td></td>
+      ${scopeActionCell(houseUnits, house.id, null)}
       <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.absChange!=null?priceOverrides[house.id].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${house.id}','house',{});this.blur();}" onblur="applyEuroFormat(this)"></td>
       <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[house.id]?.pctChange!=null?priceOverrides[house.id].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${house.id}','house',{});this.blur();}" onblur="applyPctFormat(this)"></td>
       <td></td>
@@ -1553,7 +1642,7 @@ function renderTable() {
         <td style="text-align:right;">${fmt(scaleMoveIn(computeRec(rt.rec, rtKey)))}</td>
         <td></td>
         <td>${recSummaryHtml(rt.units)}</td>
-        <td></td>
+        ${scopeActionCell(rt.units, house.id, rt.type)}
         <td class="price-change-abs" style="padding-left:8px;padding-right:4px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.absChange!=null?priceOverrides[rtKey].absChange:''}" placeholder="\u20ac" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyEuroFormat(this);handleAbsInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyEuroFormat(this)"></td>
         <td class="price-change-pct" style="padding-left:4px;padding-right:8px;"><input class="price-input" type="text" value="${priceOverrides[rtKey]?.pctChange!=null?priceOverrides[rtKey].pctChange:''}" placeholder="%" oninput="this.value=this.value.replace(/[^0-9.-]/g,'')" onkeydown="if(event.key==='Enter'){applyPctFormat(this);handlePctInput(this,'${rtKey}','roomtype',{propId:'${house.id}'});this.blur();}" onblur="applyPctFormat(this)"></td>
         <td>${noteCell(rtKey, rt.note)}</td>
@@ -1680,9 +1769,34 @@ function openStayModal(unitId) {
     mkRow(MOVE_IN_DATES[1], octPrices, currentMoveIn === 'oct1') +
     '</tbody>';
 
+  // Data labels: each bar's premium vs the Full Year (12-month) Sep 1 reference rate.
+  const fullYearRef = priceFor(unit.rate, DEFAULT_STAY_TYPE, 'sep1');
+  const premiumLabelPlugin = {
+    id: 'stayPremiumLabels',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = '600 10.5px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      chart.data.datasets.forEach((ds, di) => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, i) => {
+          const pct = Math.round((ds.data[i] / fullYearRef - 1) * 100);
+          const txt = pct === 0 ? '0%' : (pct > 0 ? '+' : '\u2212') + Math.abs(pct) + '%';
+          ctx.fillStyle = pct === 0 ? '#6b7280' : (pct > 0 ? '#15803d' : '#e05252');
+          ctx.fillText(txt, bar.x, bar.y - 4);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
   if (stayChartInst) stayChartInst.destroy();
   stayChartInst = new Chart(document.getElementById('stayChart'), {
     type: 'bar',
+    plugins: [premiumLabelPlugin],
     data: {
       labels,
       datasets: [
@@ -1706,6 +1820,7 @@ function openStayModal(unitId) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: { padding: { top: 18 } },
       plugins: {
         legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, font: { family: 'Inter', size: 11 }, color: '#6b7280' } },
         tooltip: {
@@ -2286,6 +2401,27 @@ function toggleExposure() {
   updatePanelState();
 }
 
+// Vertical guide line at the hovered x position (shared by the panel charts).
+const crosshairPlugin = {
+  id: 'crosshair',
+  afterDatasetsDraw(chart) {
+    const active = chart.tooltip && chart.tooltip.getActiveElements ? chart.tooltip.getActiveElements() : [];
+    if (!active.length) return;
+    const x = active[0].element.x;
+    const { top, bottom } = chart.chartArea;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = 'rgba(229,231,235,0.55)';
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+const hoverAnywhere = { mode: 'index', intersect: false };
+
 function renderCharts(baseRate) {
   const labels = CHART_MONTHS;
   const n = labels.length;
@@ -2326,7 +2462,11 @@ function renderCharts(baseRate) {
     padding: 10,
     titleFont: { family: 'Inter', size: 12, weight: '600' },
     bodyFont: { family: 'Inter', size: 11 },
+    boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true,
+    // the two invisible corridor datasets only exist to shade the band
+    filter: item => !/^Comp Corridor/.test(item.dataset.label),
     callbacks: {
+      labelPointStyle: () => ({ pointStyle: 'circle', rotation: 0 }),
       label: function(ctx) {
         const isExposure = ctx.chart.canvas.id === 'exposureChart';
         const suffix = isExposure ? '%' : '';
@@ -2353,12 +2493,14 @@ function renderCharts(baseRate) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      interaction: hoverAnywhere,
       plugins: { tooltip: darkTooltip, legend: { display: false } },
       scales: {
         x: { display: true, ticks: xTickOpts, grid: { color: gridColor } },
         y: { display: true, min: 0, max: 15, ticks: { ...yTickOpts, callback: v => v + '%' }, grid: { color: gridColor } },
       },
     },
+    plugins: [crosshairPlugin],
   });
 
   if (compChartInst) compChartInst.destroy();
@@ -2379,12 +2521,14 @@ function renderCharts(baseRate) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      interaction: hoverAnywhere,
       plugins: { tooltip: darkTooltip, legend: { display: false }, filler: { propagate: true } },
       scales: {
         x: { display: true, ticks: xTickOpts, grid: { color: gridColor } },
         y: { display: true, ticks: { ...yTickOpts, callback: v => '\u20ac' + v.toLocaleString('en-GB') }, grid: { color: gridColor } },
       },
     },
+    plugins: [crosshairPlugin],
   });
 }
 
@@ -2519,7 +2663,9 @@ function openUnitRateHistory(unitId) {
           padding: 10,
           titleFont: { family: 'Inter', size: 12, weight: '600' },
           bodyFont: { family: 'Inter', size: 11 },
+          boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true,
           callbacks: {
+            labelPointStyle: () => ({ pointStyle: 'circle', rotation: 0 }),
             label: function(ctx) {
               const isOverride = ctx.datasetIndex === 0 && overrideIndices.includes(ctx.dataIndex);
               let line = ' ' + ctx.dataset.label + ': \u20ac' + ctx.parsed.y.toLocaleString('en-GB');
@@ -2529,11 +2675,13 @@ function openUnitRateHistory(unitId) {
           }
         },
       },
+      interaction: hoverAnywhere,
       scales: {
         x: { display: true, ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, maxTicksLimit: 10, maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(255,255,255,0.06)' } },
         y: { display: true, ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 }, callback: v => '\u20ac' + v.toLocaleString('en-GB') }, grid: { color: 'rgba(255,255,255,0.06)' } },
       },
     },
+    plugins: [crosshairPlugin],
   });
 }
 
@@ -2645,6 +2793,18 @@ document.addEventListener('click', e => {
 });
 
 // ── Advanced Drawer ───────────────────────────────────────
+// Reset every control in the Advanced filters drawer and re-render.
+function clearAdvFilters() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('unitIdSearch', '');
+  set('roomTypeFilter', '');
+  set('alertFilter', '');
+  set('recFilter', '');
+  set('notesFilter', '');
+  ['statusVacant', 'statusOnNotice'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+  renderTable();
+}
+
 function toggleAdvDrawer() {
   advDrawerOpen = !advDrawerOpen;
   document.getElementById('advDrawer').classList.toggle('open', advDrawerOpen);
