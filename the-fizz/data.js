@@ -4,7 +4,8 @@
 
 // Demo "today" — booking curves and pace are anchored to this date,
 // mid-season for the Sep/Oct 2026 move-in cohort.
-const DEMO_TODAY = new Date(2026, 4, 15); // 15 May 2026
+const DEMO_TODAY = new Date(2026, 8, 10);      // 10 Sep 2026 — three weeks before the October intake
+const BOOKING_MOVE_IN = new Date(2026, 9, 1);  // 1 Oct 2026 — units become available; booking curves run to here
 
 // ── Seeded RNG (stable across reloads) ───────────────────────
 function _hashStr(s) {
@@ -156,12 +157,15 @@ function makeNote(rng) {
 // Booking curves, pace and demand live at the house × room-type level
 // (bookings are for a bed of a type, not a specific apartment). Units
 // below carry only their own rate + recommendation.
-function makeRoomTypeMetrics(house, roomType) {
+function makeRoomTypeMetrics(house, roomType, totalBeds) {
   const isDouble = roomType === 'Double Studio';
   const r = rngFor('rtm|' + house.id + '|' + roomType);
 
-  // Season forecast for this room-type cluster; sold = confirmed to date.
-  const fcst = isDouble ? rpickInt(r, 40, 90) : rpickInt(r, 90, 200);
+  // Season forecast for this room-type cluster = where bookings are
+  // predicted to end up at move-in. Student housing fills, so it sits
+  // between ~86% and a full house; the draw overshoots slightly and is
+  // capped so a good share of clusters forecast exactly 100% of beds.
+  const fcst = Math.max(1, Math.min(totalBeds, Math.round(totalBeds * rpick(r, 0.86, 1.06))));
 
   // Sell-through is the single signal everything hangs off: it sets the
   // booking curve's endpoint, pace vs benchmark, the demand level and —
@@ -172,7 +176,12 @@ function makeRoomTypeMetrics(house, roomType) {
   if (['Bremen', 'Prague'].includes(house.city)) { stLo = 0.33; stHi = 0.72; }
   if (isDouble) { stLo -= 0.04; stHi -= 0.04; }
   const sellThrough = rpick(r, stLo, stHi);
-  const sold = Math.round(fcst * sellThrough);
+  // sellThrough is the pace signal (vs the 0.62 benchmark below). With one
+  // month to move-in the season is largely booked, so the share actually
+  // sold today maps that signal onto 78–99% of the forecast: clusters
+  // pacing behind sit near 80%, clusters pacing ahead are nearly full.
+  const soldShare = Math.max(0.78, Math.min(0.99, 0.78 + (sellThrough - 0.33) / 0.62 * 0.21));
+  const sold = Math.round(fcst * soldShare);
 
   // Pace vs last-year benchmark (%). Benchmark sell-through at T-108
   // days out is ~62%.
@@ -276,7 +285,7 @@ function computeAlerts(m, cfg) {
   cfg = cfg || ALERT_DEFAULTS;
   const out = [];
   if (cfg.lowPace.enabled && m.ros < cfg.lowPace.threshold) {
-    out.push(makeAlert('lowPace', 'Low pace: bookings ' + (m.ros > 0 ? '+' : '') + m.ros + '% vs last year (threshold ' + cfg.lowPace.threshold + '%)'));
+    out.push(makeAlert('lowPace', 'Low pace: bookings ' + (m.ros > 0 ? '+' : '') + m.ros + '% vs target to date (threshold ' + cfg.lowPace.threshold + '%)'));
   }
   if (cfg.highDemand.enabled && m.demand > cfg.highDemand.threshold) {
     const dl = demandLevelForScore(m.demand);
@@ -319,9 +328,9 @@ function unionAlerts(directAlerts, childMetricsList, cfg) {
 const PRICING_DATA = HOUSES.map(h => {
   const r = rngFor('pricing|' + h.id);
   const roomTypes = UNIT_TYPES.map(rt => {
-    const m = makeRoomTypeMetrics(h, rt);
-    const units = makeUnits(h, rt, rt === 'Single Studio' ? 3 : 2, m);
     const totalBedsOfType = Math.round(h.totalBeds * (rt === 'Single Studio' ? 0.7 : 0.3));
+    const m = makeRoomTypeMetrics(h, rt, totalBedsOfType);
+    const units = makeUnits(h, rt, rt === 'Single Studio' ? 3 : 2, m);
     const avgRate = Math.round(units.reduce((s, u) => s + u.rate, 0) / units.length);
     const avgRec  = Math.round(units.reduce((s, u) => s + u.rec, 0) / units.length);
     return {
@@ -438,24 +447,53 @@ const STAY_CONFIG = HOUSES.map(h => {
 // around admission-results waves rather than last-minute like theme parks.
 function bookingCurveData(seedKey, sold, fcst, ros) {
   const r = rngFor('curve|' + seedKey);
-  const N = 15;  // weekly points across the booking season
+  const N = 15;  // weekly points up to and including today
+  // F weekly points after today; the last one is the move-in date.
+  const F = Math.max(1, Math.round((BOOKING_MOVE_IN - DEMO_TODAY) / (7 * 86400000)));
+  const T = N + F;
+  const todayIdx = N - 1;
   const actualTotal = sold;
   const benchmarkTotal = Math.max(1, Math.round(sold / (1 + ros / 100)));
-  // S-curve with admission-wave bumps
-  const pace = (t, total) => {
-    const x = t / (N - 1);
-    const s = 1 / (1 + Math.exp(-(x - 0.45) * 7));
-    const s0 = 1 / (1 + Math.exp(0.45 * 7));
-    const s1 = 1 / (1 + Math.exp(-0.55 * 7));
-    return Math.round(total * (s - s0) / (s1 - s0));
+
+  // One S-curve spans the whole horizon (history + forecast), so the line
+  // runs through today without a kink: the forecast is simply the rest of
+  // the same curve, scaled to land on the season forecast at move-in. The
+  // curve is centred so that the expected share booked at today is ~90%
+  // (one month out the season is largely in), which leaves a flat tail to
+  // move-in: a cluster that is nearly full barely rises, one still behind
+  // climbs a little more to reach its forecast.
+  const EXPECTED_SHARE_TODAY = 0.90;
+  const xT = todayIdx / (T - 1);
+  const k = 7;
+  const gFor = c => {
+    const sig = x => 1 / (1 + Math.exp(-k * (x - c)));
+    const s0 = sig(0), s1 = sig(1);
+    return i => (sig(i / (T - 1)) - s0) / (s1 - s0);   // 0 at season start → 1 at move-in
   };
-  const actualSeries = Array.from({ length: N }, (_, i) => pace(i, actualTotal));
-  const benchmarkSeries = Array.from({ length: N }, (_, i) => pace(i, benchmarkTotal));
+  // Bisection on the centre so g(today) hits the expected share.
+  let lo = xT - 1.5, hi = xT + 1.5, c = xT;
+  for (let it = 0; it < 40; it++) {
+    c = (lo + hi) / 2;
+    if (gFor(c)(todayIdx) > EXPECTED_SHARE_TODAY) lo = c; else hi = c;
+  }
+  const g = gFor(c);
+  const gT = g(todayIdx);
+
+  const actualSeries = Array.from({ length: N }, (_, i) => Math.round(actualTotal * g(i) / gT));
+  const benchmarkSeries = Array.from({ length: N }, (_, i) => Math.round(benchmarkTotal * g(i) / gT));
   for (let i = 1; i < N; i++) {
-    const noise = Math.round((r() - 0.5) * actualTotal * 0.06);
+    const noise = Math.round((r() - 0.5) * actualTotal * 0.05);
     actualSeries[i] = Math.max(actualSeries[i - 1], actualSeries[i] + noise);
   }
   actualSeries[N - 1] = actualTotal;
+
+  // Forecast: remaining share of the same curve, scaled from sold → fcst.
+  const forecastSeries = Array.from({ length: F + 1 }, (_, kk) =>
+    Math.round(actualTotal + (fcst - actualTotal) * (g(todayIdx + kk) - gT) / (1 - gT)));
+  // Last year keeps following the curve to its own final total.
+  const benchmarkFuture = Array.from({ length: F + 1 }, (_, kk) =>
+    Math.round(benchmarkTotal * g(todayIdx + kk) / gT));
+  const benchmarkFinal = benchmarkFuture[F];
 
   // Weekly booking counts for the last 7 weeks + benchmark
   const weekLabels = [];
@@ -475,7 +513,8 @@ function bookingCurveData(seedKey, sold, fcst, ros) {
   const weeklyBenchmark = weekLabels.map(() => Math.max(1, Math.round(weeklyRate * (0.8 + benchRng() * 0.4))));
   const weekly = weeklyBenchmark.map(b => Math.max(0, Math.round(b * (1 + ros / 100) * (0.85 + r() * 0.3))));
 
-  return { actualSeries, benchmarkSeries, weekly, weeklyBenchmark, weekLabels, benchmarkTotal };
+  return { actualSeries, benchmarkSeries, weekly, weeklyBenchmark, weekLabels, benchmarkTotal,
+           forecastSeries, benchmarkFuture, forecastTotal: fcst, benchmarkFinal, N, F };
 }
 
 // ── Parameters data (concessions / rounding / renewals removed) ──

@@ -287,6 +287,7 @@
     .bc-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; flex-wrap: wrap; }
     .bc-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
     .bc-legend-tick { display: inline-block; width: 12px; height: 0; border-top: 2px solid #2563eb; margin-right: 5px; vertical-align: 3px; }
+    .bc-legend-dash { display: inline-block; width: 14px; height: 0; margin-right: 5px; vertical-align: 3px; }
     .bc-chart-area { position: relative; width: 100%; }
     .bc-chart-area svg { width: 100%; height: auto; display: block; }
     .chart-tooltip {
@@ -444,8 +445,8 @@
             <th style="width:42px;text-align:center;">RC</th>
             <th>Status</th>
             <th class="sortable" data-sort-key="alertCount" data-sort-type="num" style="width:66px;"><span class="th-inner"><span>Alerts</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
-            <th class="sortable" data-sort-key="pctOfFcst" data-sort-type="num"><span class="th-inner"><span>Lease Pace <span class="th-sub">% of forecast</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
-            <th class="sortable" data-sort-key="ros" data-sort-type="num"><span class="th-inner"><span>Pace <span class="th-sub">vs last yr</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="fcst" data-sort-type="num"><span class="th-inner"><span>Total Forecast <span class="th-sub">beds at move-in</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
+            <th class="sortable" data-sort-key="ros" data-sort-type="num"><span class="th-inner"><span>Pace vs Target <span class="th-sub">booked vs target to date</span></span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th class="sortable" data-sort-key="demand" data-sort-type="num" style="width:76px;"><span class="th-inner"><span>Demand</span><span class="sort-ind" aria-hidden="true"><span class="sa-up">▲</span><span class="sa-down">▼</span></span></span></th>
             <th style="width:70px;">Att. Value</th>
             <th style="text-align:right;">Current<br><span class="th-sub">Rate</span></th>
@@ -957,11 +958,22 @@ function recSummaryHtml(units) {
 }
 
 // Bookings cell: % of forecast, with the raw numbers alongside.
-function bookingsCellHtml(sold, fcst, onclick) {
-  const pct = fcst > 0 ? Math.round(sold / fcst * 100) : 0;
-  return '<a href="javascript:void(0)" onclick="' + onclick + '" style="color:var(--accent);text-decoration:underline;" title="' +
-    sold.toLocaleString('en-GB') + ' of ' + fcst.toLocaleString('en-GB') + ' forecast beds sold">' + pct + '%</a>' +
-    ' <span style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + sold.toLocaleString('en-GB') + '/' + fcst.toLocaleString('en-GB') + '</span>';
+// Total forecast — where the season is predicted to end up at move-in.
+// Click opens the booking curve. Small text: share of the beds on offer.
+function forecastCellHtml(fcst, totalBeds, onclick) {
+  const pct = totalBeds > 0 ? Math.round(fcst / totalBeds * 100) : null;
+  return '<a href="javascript:void(0)" onclick="' + onclick + '" style="color:var(--accent);text-decoration:underline;font-weight:600;" title="Forecast ' +
+    fcst.toLocaleString('en-GB') + ' beds booked by move-in' + (pct != null ? ' (' + pct + '% of ' + totalBeds.toLocaleString('en-GB') + ' beds)' : '') + ' \u2014 open booking curve">' +
+    fcst.toLocaleString('en-GB') + '</a>' +
+    (pct != null ? ' <span style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + pct + '%</span>' : '');
+}
+
+// Pace vs target — beds booked today against the target for this date
+// (last year's bookings at the same point), with the % gap.
+function paceVsTargetCell(sold, ros) {
+  const target = Math.max(1, Math.round(sold / (1 + ros / 100)));
+  const cls = ros > 3 ? 'pace-pos' : ros < -3 ? 'pace-neg' : 'pace-flat';
+  return '<span class="' + cls + '" title="' + sold.toLocaleString('en-GB') + ' booked vs ' + target.toLocaleString('en-GB') + ' target to date">' + (ros > 0 ? '+' : '') + ros + '%</span>';
 }
 
 function recStateTag(unitId) {
@@ -1437,7 +1449,7 @@ function houseSortValue(house, key) {
       const n = unionAlerts(computeAlerts(house, alertCfg), house.roomTypes, alertCfg).length;
       return n || null;
     }
-    case 'pctOfFcst':  return house.fcst > 0 ? house.sold / house.fcst : null;
+    case 'fcst':       return house.fcst;
     case 'ros':        return house.ros;
     case 'demand':     return house.demand;
     case 'recPct': {
@@ -1599,8 +1611,8 @@ function renderTable() {
       </td>
       <td></td><td></td>
       <td>${alertsCellHtml(houseAlerts)}</td>
-      <td>${bookingsCellHtml(house.sold, house.fcst, `openBookingModal({level:'house',houseId:'${house.id}'})`)}</td>
-      <td>${paceCell(house.ros)}</td>
+      <td>${forecastCellHtml(house.fcst, house.totalBeds, `openBookingModal({level:'house',houseId:'${house.id}'})`)}</td>
+      <td>${paceVsTargetCell(house.sold, house.ros)}</td>
       <td>${dlBadge(house.demand)}</td>
       <td></td><td></td><td></td><td></td>
       <td>${recSummaryHtml(house.roomTypes.flatMap(rt => rt.units))}</td>
@@ -1634,8 +1646,8 @@ function renderTable() {
         <td><span class="avail-pct" style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();toggleExposureForProp('${rtKey}','${house.name.replace(/'/g,"\\'")} &middot; ${rt.type}',${rt.rate})">${(100 - parseFloat(rt.availPct)).toFixed(1)}%${parseFloat(rt.availPct) > 12.0 ? ' <span class="warn-icon">\u26a0</span>' : ''}</span></td>
         <td></td><td></td>
         <td>${alertsCellHtml(rtAlerts)}</td>
-        <td>${bookingsCellHtml(rt.sold, rt.fcst, `openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})`)}</td>
-        <td>${paceCell(rt.ros)}</td>
+        <td>${forecastCellHtml(rt.fcst, rt.totalBeds, `openBookingModal({level:'roomtype',houseId:'${house.id}',roomType:'${rt.type}'})`)}</td>
+        <td>${paceVsTargetCell(rt.sold, rt.ros)}</td>
         <td>${dlBadge(rt.demand)}</td>
         <td></td>
         <td style="text-align:right;color:var(--text-secondary);">${fmt(scaleMoveIn(rt.rate))}</td>
@@ -1966,9 +1978,15 @@ function aggregateBcData(house, rts) {
   const revFcst = rts.reduce((s, rt) => s + rt.fcst * scaleMoveIn(rt.rate), 0);
   const revW = rts.reduce((s, rt) => s + rt.sold * rt.rate, 0);
   const ros = revW ? Math.round(rts.reduce((s, rt) => s + rt.ros * rt.sold * rt.rate, 0) / revW) : 0;
+  // Tolerate a data.js without the forecast extension (e.g. a stale cached
+  // copy): the chart then falls back to the season-to-date view.
+  const F1 = (curves[0].forecastSeries || []).length;
   return {
     actualSeries: sumAt('actualSeries', N),
     benchmarkSeries: sumAt('benchmarkSeries', N),
+    forecastSeries: F1 ? sumAt('forecastSeries', F1) : null,
+    benchmarkFuture: F1 ? sumAt('benchmarkFuture', F1) : null,
+    forecastTotal: fcst,
     weekly: sumAt('weekly', M),
     weeklyBenchmark: sumAt('weeklyBenchmark', M),
     weekLabels: curves[0].weekLabels,
@@ -1981,17 +1999,20 @@ function aggregateBcData(house, rts) {
 }
 
 // ── SVG charts (inline, ported from the demand-pace modal) ──
-function bookingCurveSvg(actual, benchmark) {
+function bookingCurveSvg(actual, benchmark, forecast, benchFuture) {
   const W = 520, H = 200;
-  const padL = 36, padR = 12, padT = 14, padB = 26;
+  const padL = 36, padR = 14, padT = 20, padB = 26;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
-  const N = actual.length;
-  const maxY = Math.max(...actual, ...benchmark, 1);
+  const N = actual.length;                 // points up to and including today
+  const F = forecast && forecast.length ? forecast.length - 1 : 0;   // weeks from today to move-in
+  const T = N + F;                         // total points on the x axis
+  const todayIdx = N - 1;
+  const maxY = Math.max(...actual, ...benchmark, ...(forecast || []), ...(benchFuture || []), 1);
 
-  const xAt = i => padL + (innerW * i) / (N - 1);
+  const xAt = i => padL + (innerW * i) / (T - 1);
   const yAt = v => padT + innerH * (1 - v / maxY);
-  const buildPath = arr => arr.map((v, i) => (i === 0 ? 'M' : 'L') + xAt(i) + ',' + yAt(v)).join(' ');
+  const buildPath = (arr, offset) => arr.map((v, i) => (i === 0 ? 'M' : 'L') + xAt(i + offset) + ',' + yAt(v)).join(' ');
 
   const ticks = 4;
   const tickLines = Array.from({ length: ticks + 1 }, (_, i) => {
@@ -2001,20 +2022,51 @@ function bookingCurveSvg(actual, benchmark) {
            '<text x="' + (padL - 6) + '" y="' + (y + 3) + '" font-size="9" fill="#9ca3af" text-anchor="end" font-family="Inter">' + v.toLocaleString('en-GB') + '</text>';
   }).join('');
 
-  const xLabels = Array.from({ length: N }, (_, i) => {
-    if (i % 3 !== 0 && i !== N - 1) return '';
-    const x = xAt(i);
-    const label = i === N - 1 ? 'today' : 'W\u2212' + (N - 1 - i);
-    return '<text x="' + x + '" y="' + (H - 8) + '" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Inter">' + label + '</text>';
+  const xLabels = Array.from({ length: T }, (_, i) => {
+    // Calendar labels: each point is one week; today is DEMO_TODAY and the
+    // last point is the move-in date.
+    const dateAt = k => new Date(DEMO_TODAY.getTime() + (k - todayIdx) * 7 * 86400000);
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dLabel = d => d.getDate() + ' ' + MON[d.getMonth()];
+    let label = '';
+    if (i === todayIdx) label = 'today · ' + dLabel(dateAt(i));
+    else if (i === T - 1) label = 'move-in · ' + dLabel(typeof BOOKING_MOVE_IN !== 'undefined' ? BOOKING_MOVE_IN : dateAt(i));
+    else if (i < todayIdx && (todayIdx - i) % 4 === 0 && todayIdx - i >= 3) label = dLabel(dateAt(i));
+    else if (i > todayIdx && (i - todayIdx) % 4 === 0 && T - 1 - i >= 3) label = dLabel(dateAt(i));
+    if (!label) return '';
+    return '<text x="' + xAt(i) + '" y="' + (H - 8) + '" font-size="9" fill="' + (i === todayIdx || i === T - 1 ? '#4b5563' : '#9ca3af') + '" font-weight="' + (i === todayIdx || i === T - 1 ? '600' : '400') + '" text-anchor="middle" font-family="Inter">' + label + '</text>';
   }).join('');
+
+  // "You are here": vertical line at today + a dot on the curve with a label.
+  const todayX = xAt(todayIdx);
+  const todayY = yAt(actual[todayIdx]);
+  const fcstTotal = F ? forecast[forecast.length - 1] : actual[todayIdx];
+  const pct = fcstTotal ? Math.round(actual[todayIdx] / fcstTotal * 100) : 0;
+  // The label sits to the left of the marker (the forecast line runs to the
+  // right of it); only flip right when today is hard against the y axis.
+  const labelLeft = todayX > padL + 150;
+  const todayMarker =
+    '<line x1="' + todayX + '" y1="' + padT + '" x2="' + todayX + '" y2="' + (H - padB) + '" stroke="#e8007d" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>' +
+    '<circle cx="' + todayX + '" cy="' + todayY + '" r="4.5" fill="#fff" stroke="#e8007d" stroke-width="2"/>' +
+    '<text x="' + (labelLeft ? todayX - 8 : todayX + 8) + '" y="' + Math.max(padT + 8, todayY - 8) + '" font-size="9.5" font-weight="600" fill="#e8007d" text-anchor="' + (labelLeft ? 'end' : 'start') + '" font-family="Inter">' +
+      actual[todayIdx].toLocaleString('en-GB') + ' booked · ' + pct + '% of forecast</text>';
+  const endX = xAt(T - 1), endY = yAt(fcstTotal);
+  const endMarker = F
+    ? '<circle cx="' + endX + '" cy="' + endY + '" r="3.5" fill="#e8007d" fill-opacity=".25" stroke="#e8007d" stroke-width="1.5"/>' +
+      '<text x="' + (endX - 6) + '" y="' + Math.max(padT + 8, endY - 7) + '" font-size="9.5" font-weight="600" fill="#6b7280" text-anchor="end" font-family="Inter">forecast ' + fcstTotal.toLocaleString('en-GB') + '</text>'
+    : '';
 
   return (
     '<svg class="chart-demand" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
-      'data-w="' + W + '" data-h="' + H + '" data-padl="' + padL + '" data-padr="' + padR + '" data-padt="' + padT + '" data-padb="' + padB + '" data-maxy="' + maxY + '">' +
+      'data-w="' + W + '" data-h="' + H + '" data-padl="' + padL + '" data-padr="' + padR + '" data-padt="' + padT + '" data-padb="' + padB + '" data-maxy="' + maxY + '" data-n="' + N + '" data-t="' + T + '">' +
       tickLines +
-      '<path d="' + buildPath(benchmark) + '" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>' +
-      '<path d="' + buildPath(actual)    + '" stroke="#e8007d" stroke-width="2"   fill="none"/>' +
+      '<path d="' + buildPath(benchmark, 0) + '" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>' +
+      (F && benchFuture ? '<path d="' + buildPath(benchFuture, todayIdx) + '" stroke="#c4c9d2" stroke-width="1.5" stroke-dasharray="2 3" fill="none"/>' : '') +
+      (F ? '<path d="' + buildPath(forecast, todayIdx) + '" stroke="#e8007d" stroke-width="2" stroke-dasharray="5 4" fill="none" opacity=".75"/>' : '') +
+      '<path d="' + buildPath(actual, 0)    + '" stroke="#e8007d" stroke-width="2"   fill="none"/>' +
       xLabels +
+      endMarker +
+      todayMarker +
       '<line class="chart-guide" x1="0" y1="' + padT + '" x2="0" y2="' + (H - padB) + '" stroke="rgba(232,0,125,0.5)" stroke-width="1" style="display:none"/>' +
       '<g class="chart-markers" style="display:none">' +
         '<circle r="4" fill="#9ca3af" stroke="#fff" stroke-width="1.5"/>' +
@@ -2162,12 +2214,13 @@ function renderBcModal() {
       '<div class="bc-body">' +
         '<div class="bc-col">' +
           '<div class="bc-panel">' +
-            '<div class="bc-panel-title">Booking curve \u00b7 ' + esc(level === 'house' ? 'all room types' : (level === 'unit' ? unit.roomType : roomType.type)) + ' \u00b7 season to date</div>' +
+            '<div class="bc-panel-title">Booking curve \u00b7 ' + esc(level === 'house' ? 'all room types' : (level === 'unit' ? unit.roomType : roomType.type)) + ' \u00b7 season to move-in</div>' +
             '<div class="bc-legend">' +
               '<span><span class="swatch" style="background:#e8007d"></span>This year</span>' +
+              '<span><span class="bc-legend-dash" style="border-top:2px dashed #e8007d"></span>Forecast to move-in</span>' +
               '<span><span class="swatch" style="background:#9ca3af;border:1px dashed #9ca3af"></span>Benchmark (last year)</span>' +
             '</div>' +
-            '<div class="bc-chart-area">' + bookingCurveSvg(m.actualSeries, m.benchmarkSeries) + '</div>' +
+            '<div class="bc-chart-area">' + bookingCurveSvg(m.actualSeries, m.benchmarkSeries, m.forecastSeries, m.benchmarkFuture) + '</div>' +
           '</div>' +
           '<div class="bc-panel">' +
             '<div class="bc-panel-title">Last 7 weeks \u00b7 bookings per week</div>' +
@@ -2223,6 +2276,8 @@ function wireBookingCurveTooltip(svg, data) {
   const maxY = +ds.maxy;
   const innerH = H - padT - padB;
   const N = data.actualSeries.length;
+  const T = +ds.t || N;
+  const todayIdx = N - 1;
   const yAt = v => padT + innerH * (1 - v / maxY);
 
   const guide = svg.querySelector('.chart-guide');
@@ -2245,16 +2300,22 @@ function wireBookingCurveTooltip(svg, data) {
     const sx = px * (W / rect.width);
     const sy = py * (H / rect.height);
     if (sx < padL || sx > W - padR || sy < padT || sy > H - padB) return hide();
-    const i = Math.max(0, Math.min(N - 1, Math.round((sx - padL) / innerW * (N - 1))));
-    const snapVbX = padL + innerW * (i / (N - 1));
+    const i = Math.max(0, Math.min(T - 1, Math.round((sx - padL) / innerW * (T - 1))));
+    const snapVbX = padL + innerW * (i / (T - 1));
     guide.setAttribute('x1', snapVbX);
     guide.setAttribute('x2', snapVbX);
     guide.style.display = '';
 
-    const series = [
-      { name: 'Benchmark', color: '#9ca3af', value: data.benchmarkSeries[i] },
-      { name: 'This year', color: '#e8007d', value: data.actualSeries[i] },
-    ];
+    const future = i > todayIdx && data.forecastSeries;
+    const series = future
+      ? [
+          { name: 'Benchmark', color: '#c4c9d2', value: data.benchmarkFuture[i - todayIdx] },
+          { name: 'Forecast',  color: '#e8007d', value: data.forecastSeries[i - todayIdx] },
+        ]
+      : [
+          { name: 'Benchmark', color: '#9ca3af', value: data.benchmarkSeries[i] },
+          { name: 'This year', color: '#e8007d', value: data.actualSeries[i] },
+        ];
     series.forEach((s, idx) => {
       markers[idx].setAttribute('cx', snapVbX);
       markers[idx].setAttribute('cy', yAt(s.value));
@@ -2262,7 +2323,12 @@ function wireBookingCurveTooltip(svg, data) {
     });
     markersG.style.display = '';
 
-    const weekLabel = i === N - 1 ? 'This week' : 'W\u2212' + (N - 1 - i);
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dAt = k => { const d = new Date(DEMO_TODAY.getTime() + (k - todayIdx) * 7 * 86400000); return d.getDate() + ' ' + MON[d.getMonth()]; };
+    const weekLabel = i === todayIdx ? 'Today · ' + dAt(i)
+      : i === T - 1 ? 'Move-in · ' + (typeof BOOKING_MOVE_IN !== 'undefined' ? BOOKING_MOVE_IN.getDate() + ' ' + MON[BOOKING_MOVE_IN.getMonth()] : dAt(i))
+      : i > todayIdx ? 'Forecast · week of ' + dAt(i) + ' (+' + (i - todayIdx) + 'w)'
+      : 'Week of ' + dAt(i) + ' (W\u2212' + (todayIdx - i) + ')';
     tip.innerHTML =
       '<div class="chart-tooltip-header">' + weekLabel + '</div>' +
       series.map(s =>
